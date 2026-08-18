@@ -34,6 +34,22 @@
   }
   .tagline{margin:0;max-width:46ch;color:var(--muted);font-size:17px}
 
+  /* tools: shuffle + sort */
+  .tools{display:flex;flex-wrap:wrap;gap:10px;padding:26px 0 0}
+  .tool{
+    display:inline-flex;align-items:center;gap:8px;
+    font:inherit;font-size:13px;letter-spacing:.08em;text-transform:uppercase;
+    background:none;border:1px solid var(--line);border-radius:999px;
+    padding:8px 16px;color:var(--muted);cursor:pointer;
+    transition:.15s ease;
+  }
+  .tool:hover{color:var(--ink);border-color:#d3c9c5}
+  .tool:focus-visible{outline:2px solid var(--cocoa);outline-offset:3px}
+  .tool[aria-pressed="true"]{background:var(--cocoa);border-color:var(--cocoa);color:#fff}
+  .tool svg{width:17px;height:17px;fill:currentColor;flex-shrink:0}
+  /* nudge the shuffle arrows on press */
+  .tool:active svg{transform:scale(.9)}
+
   /* filters */
   nav{
     display:flex;flex-wrap:wrap;gap:8px;
@@ -122,6 +138,19 @@
     <p class="tagline">My digital shelf of some cups and glasses I&rsquo;ve liked enough to draw &mdash; presented in no particular order.</p>
   </header>
 
+  <div class="tools">
+    <button class="tool" id="shuffle" type="button" aria-pressed="false">
+      <!-- Material Icons: shuffle -->
+      <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+      Shuffle
+    </button>
+    <button class="tool" id="sort" type="button" aria-pressed="false">
+      <!-- Material Icons: arrow_upward / arrow_downward -->
+      <svg id="sortIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
+      <span id="sortLabel">A&ndash;Z</span>
+    </button>
+  </div>
+
   <nav id="filters" aria-label="Filter by kind of drink"></nav>
   <p class="count" id="count"></p>
 
@@ -194,6 +223,9 @@ const shelf   = document.getElementById("shelf");
 const filters = document.getElementById("filters");
 const countEl = document.getElementById("count");
 let active = "All";
+let order  = "default";        // "default" | "shuffle" | "asc" | "desc"
+let bag    = [];               // shuffled sequence of indices into DRINKS
+const opened = new Set();      // places whose address is showing, kept across re-sorts
 
 const kinds = ["All", ...new Set(DRINKS.map(d => d.kind))];
 
@@ -213,8 +245,56 @@ kinds.forEach(kind => {
   filters.appendChild(b);
 });
 
+const shuffleBtn = document.getElementById("shuffle");
+const sortBtn    = document.getElementById("sort");
+const sortLabel  = document.getElementById("sortLabel");
+const sortIcon   = document.getElementById("sortIcon");
+
+const ARROW_UP   = "M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z";
+const ARROW_DOWN = "M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z";
+
+shuffleBtn.addEventListener("click", () => {
+  // Fisher-Yates over the indices, so every cup can land anywhere
+  bag = DRINKS.map((_, i) => i);
+  for (let i = bag.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [bag[i], bag[j]] = [bag[j], bag[i]];
+  }
+  order = "shuffle";
+  syncTools();
+  render();
+});
+
+sortBtn.addEventListener("click", () => {
+  order = order === "asc" ? "desc" : "asc";
+  syncTools();
+  render();
+});
+
+function syncTools(){
+  shuffleBtn.setAttribute("aria-pressed", String(order === "shuffle"));
+  sortBtn.setAttribute("aria-pressed", String(order === "asc" || order === "desc"));
+  const desc = order === "desc";
+  sortLabel.innerHTML = desc ? "Z&ndash;A" : "A&ndash;Z";
+  sortIcon.firstElementChild.setAttribute("d", desc ? ARROW_DOWN : ARROW_UP);
+  sortBtn.setAttribute("aria-label",
+    desc ? "Sort by place, Z to A" : "Sort by place, A to Z");
+}
+
+function ordered(list){
+  const by = (a, b) => a.place.localeCompare(b.place, "en", { sensitivity: "base" });
+  if (order === "asc")  return [...list].sort(by);
+  if (order === "desc") return [...list].sort((a, b) => by(b, a));
+  if (order === "shuffle") {
+    const seat = d => bag.indexOf(DRINKS.indexOf(d));
+    return [...list].sort((a, b) => seat(a) - seat(b));
+  }
+  return list;
+}
+
 function render(){
-  const list = active === "All" ? DRINKS : DRINKS.filter(d => d.kind === active);
+  const kindOf = active === "All" ? DRINKS : DRINKS.filter(d => d.kind === active);
+  const list = ordered(kindOf);
 
   countEl.textContent =
     list.length + (list.length === 1 ? " cup" : " cups");
@@ -226,12 +306,15 @@ function render(){
 
     const sub = [d.drink, d.city].filter(Boolean).join(" · ");
 
-    const panelId = "addr-" + i;
+    const slug = d.place.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const panelId = "addr-" + slug;
+    const isOpen = opened.has(d.place);
+    if (isOpen) li.classList.add("open");
 
     li.innerHTML = `
       <figure>
         <button class="cupbtn" type="button"
-                aria-expanded="false" aria-controls="${panelId}">
+                aria-expanded="${isOpen}" aria-controls="${panelId}">
           <img src="${d.image}" alt="Illustration of a ${d.drink.toLowerCase()} cup from ${d.place}" loading="lazy">
           <figcaption>
             <span class="place">${d.place}</span>
@@ -250,6 +333,7 @@ function render(){
       btn.addEventListener("click", () => {
         const open = li.classList.toggle("open");
         btn.setAttribute("aria-expanded", String(open));
+        open ? opened.add(d.place) : opened.delete(d.place);
       });
     }
 
@@ -257,6 +341,7 @@ function render(){
   });
 }
 
+syncTools();
 render();
 </script>
 </body>
