@@ -3,442 +3,724 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Drinks I Sip</title>
-<meta name="description" content="My digital shelf of some cups and glasses I've liked enough to draw.">
+<title>Drinks I Sip — the board</title>
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+
+<link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
+<script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
 
 <style>
   :root{
-    --ink:#1a1414;
-    --page:#fff;
-    --radius:12px;
-    --gap:14px;
+    --paper:#ffffff;
+    --flap:#f3f3f3;
+    --rule:#e7e7e7;
+    --mute:#9b9b9b;
+    --graphite:#6b6b6b;
+    --ink:#141414;
 
-    /* palette lifted from the reference */
-    --cream:#fef6e9;
-    --amber:#ffb567;
-    --salmon:#ffb8a4;
-    --stone:#d9d9d9;
-    --teal:#003f48;
-    --rust:#e73d00;
+    --pad:16px;
+    --card:4px;
 
-    --serif:"Instrument Serif",ui-serif,Georgia,"Times New Roman",serif;
-    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --ui:"Archivo",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   *{box-sizing:border-box}
-  html{-webkit-text-size-adjust:100%}
   body{
-    margin:0;
-    padding:var(--gap);
-    background:var(--page);
-    color:var(--ink);
-    font-family:var(--sans);
-    font-size:16px;
-    line-height:1.4;
+    margin:0;height:100vh;overflow:hidden;
+    background:var(--paper);color:var(--ink);
+    font-family:var(--ui);font-size:15px;line-height:1.4;
     -webkit-font-smoothing:antialiased;
   }
 
-  /* ---------- bento grid ---------- */
-  .grid{
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:var(--gap);
-    list-style:none;margin:0;padding:0;
-  }
-  .tile{
-    position:relative;
-    border-radius:var(--radius);
-    padding:26px;
-    display:flex;
-    flex-direction:column;
-    overflow:hidden;
+  .frame{
+    height:100vh;padding:var(--pad);
+    display:grid;grid-template-rows:auto auto 1fr;gap:var(--pad);
   }
 
-  /* ---------- intro tile ---------- */
-  .intro{
-    grid-column:span 2;
-    background:var(--cream);
-    min-height:430px;
-    justify-content:space-between;
-    gap:28px;
+  /* ---------------------------------------------------------- masthead */
+  .masthead{
+    display:flex;justify-content:space-between;align-items:baseline;
+    font-family:var(--mono);font-size:11px;font-weight:500;
+    letter-spacing:.16em;text-transform:uppercase;
   }
-  .wordmark{
-    font-family:var(--sans);
-    font-size:14px;font-weight:500;letter-spacing:-.01em;
-    margin:0;
-  }
-  .intro h1{
-    font-family:var(--serif);
-    font-weight:400;
-    font-size:clamp(46px,6.4vw,92px);
-    line-height:.94;
-    letter-spacing:-.02em;
-    margin:0 0 18px;
-  }
-  .tagline{
-    margin:0;max-width:44ch;
-    font-size:16.5px;line-height:1.45;
-    color:#5f5551;
-  }
+  .masthead .mark{color:var(--ink)}
+  .masthead .tally{color:var(--mute)}
 
-  /* ---------- controls ---------- */
-  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
-  .btn{
-    display:inline-flex;align-items:center;gap:7px;
-    font-family:var(--sans);font-size:11.5px;font-weight:500;
-    letter-spacing:.09em;text-transform:uppercase;
-    background:transparent;
-    border:1px solid rgba(26,20,20,.18);
-    border-radius:999px;
-    padding:8px 14px;
-    color:#5f5551;cursor:pointer;
-    transition:background .15s ease,color .15s ease,border-color .15s ease;
+  /* ------------------------------------------------------------- board */
+  .board{
+    border:1px solid var(--rule);border-radius:var(--card);
+    padding:16px 16px 13px;
   }
-  .btn:hover{border-color:var(--ink);color:var(--ink)}
-  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
-  .btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--cream)}
-  .btn svg{width:15px;height:15px;fill:currentColor;flex-shrink:0}
-  .rule{width:100%;height:1px;background:rgba(26,20,20,.14);margin:2px 0}
-  .count{
-    font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
-    color:#8b7f7c;margin:0;
+  .flaps{
+    display:grid;grid-template-columns:repeat(var(--cells),minmax(0,1fr));
+    gap:2px;
   }
-
-  /* ---------- cup tiles ---------- */
-  .cup{padding:0}
-  .cupbtn{
-    all:unset;
-    box-sizing:border-box;
-    display:flex;flex-direction:column;
-    width:100%;height:100%;
-    min-height:380px;
-    padding:26px;
-    cursor:pointer;
-  }
-  .cupbtn:focus-visible{outline:2px solid var(--ink);outline-offset:-6px;border-radius:var(--radius)}
-
-  .cup .stage{
-    flex:1;
+  .deck-title{flex:1}
+  .back{display:none}
+  .fab{display:none}
+  .flap{
+    position:relative;aspect-ratio:.66;
+    background:var(--flap);border-radius:1px;
     display:flex;align-items:center;justify-content:center;
-    padding:6px 0 18px;
+    perspective:200px;overflow:hidden;
+  }
+  /* the seam where the two leaves meet */
+  .flap::after{
+    content:"";position:absolute;left:0;right:0;top:50%;
+    height:1px;background:var(--paper);z-index:2;
+  }
+  .flap.blank{background:#fafafa}
+  .flap .ch{
+    font-family:var(--mono);font-weight:600;
+    font-size:clamp(10px,2vw,30px);
+    line-height:1;color:var(--ink);
+    transform-origin:50% 50%;
+  }
+  @keyframes drop{ from{ transform:rotateX(-88deg) } to{ transform:rotateX(0) } }
+  .flap.turning .ch{ animation:drop 34ms linear }
+
+  .readout{
+    margin-top:11px;display:flex;gap:10px;flex-wrap:wrap;
+    font-family:var(--mono);font-size:10.5px;font-weight:400;
+    letter-spacing:.14em;text-transform:uppercase;color:var(--graphite);
+  }
+  .readout span:not(:last-child)::after{content:" ·";color:var(--rule);margin-left:10px}
+  .readout .shut{color:var(--ink)}
+
+  .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+
+  /* ------------------------------------------------------------- cards */
+  .decks{
+    display:grid;grid-template-columns:1.35fr .9fr 1fr;gap:var(--pad);
     min-height:0;
   }
-  .cup img{
-    max-width:78%;max-height:210px;
-    width:auto;height:auto;
-    object-fit:contain;
-    /* white artwork background dissolves into the tile colour */
-    mix-blend-mode:multiply;
-    transition:transform .3s cubic-bezier(.2,.7,.3,1);
+  .deck{
+    display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;
+    border:1px solid var(--rule);border-radius:var(--card);background:var(--paper);
   }
-  .cupbtn:hover img{transform:translateY(-7px) rotate(-1.5deg)}
-
-  .kicker{
-    font-size:11px;font-weight:500;letter-spacing:.11em;text-transform:uppercase;
-    opacity:.62;margin:0 0 7px;
-  }
-  .place{
-    font-family:var(--serif);font-weight:400;
-    font-size:clamp(27px,2.5vw,40px);
-    line-height:1;letter-spacing:-.015em;
-    margin:0;
-  }
-  .rank{
-    display:inline-block;margin-top:11px;
-    font-size:10.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;
-    border:1px solid currentColor;border-radius:999px;padding:4px 9px;opacity:.7;
-  }
-  .note{
-    margin:10px 0 0;max-width:30ch;
-    font-size:13.5px;line-height:1.45;font-style:italic;opacity:.72;
+  .deck-head{
+    flex:none;display:flex;justify-content:space-between;align-items:center;
+    padding:12px 14px 10px;
+    font-family:var(--mono);font-size:10.5px;font-weight:500;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--mute);
   }
 
-  /* address reveal */
-  .addr{
-    display:grid;grid-template-rows:0fr;
-    transition:grid-template-rows .3s ease;
+  .ghost{
+    font-family:var(--mono);font-size:10.5px;font-weight:500;
+    letter-spacing:.14em;text-transform:uppercase;
+    color:var(--mute);background:none;border:1px solid var(--rule);
+    border-radius:2px;padding:3px 9px;cursor:pointer;
   }
-  .cup.open .addr{grid-template-rows:1fr}
-  .addr > *{display:block;overflow:hidden;min-height:0}
-  .addr p{
-    margin:14px 0 0;padding-top:13px;
-    border-top:1px solid rgba(26,20,20,.2);
-    font-size:13.5px;line-height:1.45;max-width:28ch;
-  }
-  .addr a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(26,20,20,.35)}
-  .addr a:hover{border-bottom-color:currentColor}
+  .ghost:hover{color:var(--ink);border-color:#cfcfcf}
 
-  /* tile colours */
-  .c-amber{background:var(--amber)}
-  .c-salmon{background:var(--salmon)}
-  .c-cream{background:var(--cream)}
-  .c-stone{background:var(--stone)}
+  /* --------------------------------------------------------------- map */
+  #map{flex:1;min-height:0}
+  .maplibregl-ctrl-attrib{font-size:9px;font-family:var(--mono)}
 
-  /* ---------- closing tile ---------- */
-  .outro{
-    grid-column:1/-1;
-    background:var(--teal);
-    color:var(--cream);
-    min-height:190px;
-    justify-content:flex-end;
+  /* ------------------------------------------------------------- list */
+  .list{flex:1;min-height:0;overflow-y:auto;padding-bottom:10px}
+  .row{
+    width:100%;text-align:left;background:none;border:0;
+    font:inherit;color:inherit;cursor:pointer;
+    padding:9px 14px 9px 13px;
+    border-left:2px solid transparent;
+    display:flex;justify-content:space-between;align-items:baseline;gap:10px;
   }
-  .outro p.line{
-    font-family:var(--serif);
-    font-size:clamp(26px,3.4vw,44px);
-    line-height:1.05;letter-spacing:-.015em;
-    margin:0;max-width:20ch;
+  .row:hover{background:#fafafa}
+  .row[aria-selected="true"]{border-left-color:var(--ink);background:#f7f7f7}
+  .row-name{font-size:14.5px;font-weight:500;letter-spacing:-.005em}
+  .row[aria-selected="true"] .row-name{font-weight:600}
+  .row-where{
+    display:block;margin-top:2px;
+    font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+    text-transform:uppercase;color:var(--mute);
   }
-  .outro .kicker{opacity:.7;margin-bottom:10px}
+  .row-visits{
+    flex:none;font-family:var(--mono);font-size:10px;letter-spacing:.1em;
+    color:var(--mute);
+  }
 
-  /* ---------- responsive ---------- */
-  @media (max-width:900px){
-    .grid{grid-template-columns:repeat(2,1fr)}
-    .intro{grid-column:span 2;min-height:0}
+  /* --------------------------------------------------------------- cup */
+  #stage{flex:1;min-height:0}
+
+  @media (max-width:940px){
+    :root{--pad:12px}
+    body{height:100dvh;overflow:hidden}
+    .frame{height:100dvh}
+
+    .masthead{font-size:10px;letter-spacing:.12em;white-space:nowrap;gap:10px}
+    .readout{font-size:9.5px;letter-spacing:.1em;gap:8px}
+    .readout span:not(:last-child)::after{margin-left:8px}
+    .board{padding:12px 12px 10px}
+
+    /* keep the last row clear of the map button */
+    .list{padding-bottom:64px}
+
+    .flaps{gap:1px}
+    .flap .ch{font-size:clamp(11px,3.4vw,30px)}
+
+    /* cup sits directly under the board; the list takes what is left */
+    .decks{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+    .deck--cup{order:1;height:min(30vh,240px)}
+    .deck--list{order:2;min-height:0}
+
+    /* the map is a place you go to, not a panel you look past */
+    .deck--map{
+      position:fixed;inset:0;z-index:40;
+      border:0;border-radius:0;background:var(--paper);
+      transform:translateY(101%);
+      transition:transform .3s cubic-bezier(.4,0,.2,1);
+    }
+    .deck--map.open{transform:none}
+    .deck--map .deck-head{padding:14px}
+    .deck-title{display:none}
+    .back{display:inline-flex}
+
+    .fab{
+      display:inline-flex;align-items:center;
+      position:fixed;z-index:30;
+      right:var(--pad);bottom:calc(var(--pad) + env(safe-area-inset-bottom));
+      font-family:var(--mono);font-size:11px;font-weight:500;
+      letter-spacing:.14em;text-transform:uppercase;
+      color:var(--paper);background:var(--ink);
+      border:0;border-radius:2px;padding:11px 18px;cursor:pointer;
+      box-shadow:0 2px 14px rgba(0,0,0,.16);
+    }
   }
-  @media (max-width:620px){
-    :root{--gap:10px}
-    .grid{grid-template-columns:1fr}
-    .intro{grid-column:span 1}
-    .intro h1{font-size:clamp(42px,13vw,64px)}
-    .cupbtn{min-height:320px}
-    .tile,.cupbtn{padding:22px}
+  @media (prefers-reduced-motion:reduce){
+    .deck--map{transition:none}
+  }
+  @media (prefers-reduced-motion:reduce){
+    .flap.turning .ch{animation:none}
   }
 </style>
 </head>
 <body>
 
-<ul class="grid" id="grid">
-  <li class="tile intro">
-    <p class="wordmark">Drinks I Sip</p>
-    <div>
-      <h1>Drinks<br>I Sip</h1>
-      <p class="tagline">My digital shelf of some cups and glasses I&rsquo;ve liked enough to draw &mdash; presented in no particular order.</p>
-    </div>
-    <div>
-      <div class="controls" style="margin-bottom:12px">
-        <button class="btn" id="shuffle" type="button" aria-pressed="false">
-          <!-- Material Icons: shuffle -->
-          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
-          Shuffle
-        </button>
-        <button class="btn" id="sort" type="button" aria-pressed="false">
-          <!-- Material Icons: arrow_upward / arrow_downward -->
-          <svg id="sortIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
-          <span id="sortLabel">A&ndash;Z</span>
-        </button>
+<div class="frame">
+
+  <header class="masthead">
+    <span class="mark">Drinks I Sip</span>
+    <span class="tally" id="tally"></span>
+  </header>
+
+  <section class="board" role="status" aria-live="polite">
+    <div class="sr" id="board-sr"></div>
+    <div class="flaps" id="flaps" aria-hidden="true"></div>
+    <div class="readout" id="readout"></div>
+  </section>
+
+  <div class="decks">
+
+    <section class="deck deck--map" id="deck-map" aria-hidden="false">
+      <div class="deck-head">
+        <span class="deck-title">Map</span>
+        <button class="ghost back" id="close-map">Back to list</button>
+        <button class="ghost" id="all">Show all</button>
       </div>
-      <div class="rule"></div>
-      <nav class="controls" id="filters" aria-label="Filter by kind of drink" style="margin:12px 0 10px"></nav>
-      <p class="count" id="count"></p>
-    </div>
-  </li>
-</ul>
+      <div id="map"></div>
+    </section>
+
+    <section class="deck deck--list">
+      <div class="deck-head"><span>Places</span><span id="count"></span></div>
+      <div class="list" id="list"></div>
+    </section>
+
+    <section class="deck deck--cup">
+      <div class="deck-head"><span>Cup</span></div>
+      <div id="stage"></div>
+    </section>
+
+  </div>
+
+  <button class="fab" id="open-map">Map</button>
+</div>
 
 <script>
-/* ------------------------------------------------------------------
-   THE LIST. Add a drink by copying one block.
-
-   image  – file in assets/
-   place  – where you had it
-   address– street address, revealed when the tile is clicked
-   drink  – what it was
-   kind   – "Hot Chocolate" | "Coffee" | "Cocktail" | "Beer" | ...
-            (filter buttons build themselves from these)
-   city   – optional, "" hides it
-   rank   – optional number, your ranking within its kind. null hides it
-   note   – optional one line. "" hides it
-
-   Tile colours are assigned by position, so the grid stays balanced
-   however many drinks you add.
-------------------------------------------------------------------- */
-const DRINKS = [
-  {
-    image: "assets/caffe-panna.png",
-    place: "Caffè Panna",
-    address: "77 Irving Pl, New York, NY 10003",
-    drink: "Hot Chocolate",
-    kind:  "Hot Chocolate",
-    city:  "",
-    rank:  null,
-    note:  ""
-  },
-  {
-    image: "assets/the-cocoa-store.png",
-    place: "The Cocoa Store",
-    address: "873 Broadway, 6th floor, New York, NY 10003",
-    drink: "Hot Chocolate",
-    kind:  "Hot Chocolate",
-    city:  "",
-    rank:  null,
-    note:  ""
-  },
-  {
-    image: "assets/amorino.png",
-    place: "Amorino",
-    address: "721 8th Ave, New York, NY 10036",
-    drink: "Hot Chocolate",
-    kind:  "Hot Chocolate",
-    city:  "",
-    rank:  null,
-    note:  ""
-  },
-  {
-    image: "assets/breads-bakery.png",
-    place: "Breads Bakery",
-    address: "18 E 16th St, New York, NY 10003",
-    drink: "Hot Chocolate",
-    kind:  "Hot Chocolate",
-    city:  "",
-    rank:  null,
-    note:  ""
-  }
+const PLACES = [
+  { place:"Amorino Times Square",     address:"721 8th Ave",              lat:40.7595050, lng:-73.9883714, visits:1 , sleeve:"amorino"},
+  { place:"Angelina Paris",           address:"1050 Avenue of the Americas", lat:40.7531610, lng:-73.9849272, visits:1 , sleeve:"angelina-paris"},
+  { place:"Breads Bakery",            address:"18 E 16th St",             lat:40.7365429, lng:-73.9918617, visits:1 , sleeve:"breads-bakery"},
+  { place:"Caffè Panna",              address:"77 Irving Pl",             lat:40.7369641, lng:-73.9868018, visits:1 , sleeve:"caffe-panna"},
+  { place:"Cocoa Cabin",              address:"Bryant Park Winter Village", lat:40.7537509, lng:-73.9835428, visits:1 , sleeve:"cocoa-cabin"},
+  { place:"Frenchette Bakery",        address:"220 Church St",            lat:40.7170950, lng:-74.0067095, visits:2 , sleeve:"frenchette-bakery"},
+  { place:"Glace by Noglu",           address:"1266 Madison Ave",         lat:40.7838771, lng:-73.9568025, visits:1 },
+  { place:"Glace Rockefeller Center", address:"30 Rockefeller Plaza",     lat:40.7591232, lng:-73.9795560, visits:1 },
+  { place:"Gramercy Tavern",          address:"42 E 20th St",             lat:40.7383840, lng:-73.9884222, visits:1 },
+  { place:"Jacques Torres Chocolate", address:"107 E 42nd St",            lat:40.7516533, lng:-73.9761497, visits:1 },
+  { place:"La Maison du Chocolat",    address:"51 W 49th St",             lat:40.7589380, lng:-73.9797471, visits:2 },
+  { place:"Mango Mango",              address:"175 2nd St, Jersey City",  lat:40.7221015, lng:-74.0402704, visits:1 },
+  { place:"MarieBelle New York",      address:"484 Broome St",            lat:40.7232184, lng:-74.0022708, visits:2 },
+  { place:"Matto Espresso",           address:"1 Maiden Ln",              lat:40.7097338, lng:-74.0096119, visits:1 },
+  { place:"Max Brenner Union Square", address:"841 Broadway",             lat:40.7342040, lng:-73.9911071, visits:1, closed:true },
+  { place:"No Chewing Allowed",       address:"Bryant Park, 31 W 40th St", lat:40.7527077, lng:-73.9828108, visits:1 },
+  { place:"Ole & Steen",              address:"Barclay St, near WTC",     lat:40.7129651, lng:-74.0097789, visits:1 },
+  { place:"Rigor Hill Market",        address:"227 W Broadway",           lat:40.7192673, lng:-74.0060718, visits:1 },
+  { place:"S'mores N'more",           address:"Bryant Park Winter Village", lat:40.7537509, lng:-73.9835428, visits:1 },
+  { place:"Starbucks Reserve",        address:"350 5th Ave (Empire State Building)", lat:40.7484421, lng:-73.9856589, visits:1 },
+  { place:"The Cocoa Store",          address:"873 Broadway, 6th floor",  lat:40.7379839, lng:-73.9902332, visits:1 },
+  { place:"United Chocolate Works",   address:"41 W 40th St",             lat:40.7538162, lng:-73.9843175, visits:1 },
+  { place:"Venchi NoMad",             address:"1178 Broadway",            lat:40.7453494, lng:-73.9885661, visits:1 }
 ];
 
-/* Light tones only: the artwork is multiplied onto the tile, so a dark
-   background would swallow the line work. */
-const TONES = ["c-amber", "c-salmon", "c-stone", "c-cream"];
+let selected = 0;
+let mapReady = false;
 
-const grid    = document.getElementById("grid");
-const filters = document.getElementById("filters");
-const countEl = document.getElementById("count");
-const intro   = document.querySelector(".intro");
+/* ------------------------------------------------------------ THE BOARD
+   A Solari unit turns its drum in order, so a letter far around the
+   alphabet takes longer to arrive than one nearby. That ordering is the
+   whole character of the thing — random glyph cycling reads as a slot
+   machine instead. */
+const DRUM = " ABCDEFGHIJKLMNOPQRSTUVWXYZÈ&'0123456789";
+const STEP = 34;   // ms per flap
+const LAG  = 22;   // ms of stagger between neighbouring cells
 
-let active = "All";
-let order  = "default";        // "default" | "shuffle" | "asc" | "desc"
-let bag    = [];               // shuffled sequence of indices into DRINKS
-const opened = new Set();      // places whose address is showing, kept across re-sorts
+/* One long row on desktop; two shorter rows on a phone. 18 is the
+   narrowest width that still wraps every name onto two lines at a word
+   boundary — "Glace Rockefeller Center" is the one that sets the floor. */
+const WIDE = Math.max(...PLACES.map(p => p.place.length));
+const NARROW_COLS = 18, NARROW_ROWS = 2;
 
-/* ---------- filters ---------- */
-const kinds = ["All", ...new Set(DRINKS.map(d => d.kind))];
+const narrow  = matchMedia('(max-width: 940px)');
+const reduced = matchMedia('(prefers-reduced-motion: reduce)');
 
-kinds.forEach(kind => {
-  const b = document.createElement("button");
-  b.className = "btn";
-  b.type = "button";
-  b.textContent = kind;
-  b.setAttribute("aria-pressed", String(kind === active));
-  b.addEventListener("click", () => {
-    active = kind;
-    [...filters.children].forEach(c =>
-      c.setAttribute("aria-pressed", String(c.textContent === kind))
-    );
-    render();
-  });
-  filters.appendChild(b);
-});
+const flaps = document.getElementById('flaps');
+let cols = 0, rows = 0, cells = [];
 
-/* ---------- shuffle + sort ---------- */
-const shuffleBtn = document.getElementById("shuffle");
-const sortBtn    = document.getElementById("sort");
-const sortLabel  = document.getElementById("sortLabel");
-const sortIcon   = document.getElementById("sortIcon");
-
-const ARROW_UP   = "M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z";
-const ARROW_DOWN = "M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z";
-
-shuffleBtn.addEventListener("click", () => {
-  // Fisher-Yates over the indices, so every cup can land anywhere
-  bag = DRINKS.map((_, i) => i);
-  for (let i = bag.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [bag[i], bag[j]] = [bag[j], bag[i]];
-  }
-  order = "shuffle";
-  syncTools();
-  render();
-});
-
-sortBtn.addEventListener("click", () => {
-  order = order === "asc" ? "desc" : "asc";
-  syncTools();
-  render();
-});
-
-function syncTools(){
-  shuffleBtn.setAttribute("aria-pressed", String(order === "shuffle"));
-  sortBtn.setAttribute("aria-pressed", String(order === "asc" || order === "desc"));
-  const desc = order === "desc";
-  sortLabel.innerHTML = desc ? "Z&ndash;A" : "A&ndash;Z";
-  sortIcon.firstElementChild.setAttribute("d", desc ? ARROW_DOWN : ARROW_UP);
-  sortBtn.setAttribute("aria-label",
-    desc ? "Sort by place, Z to A" : "Sort by place, A to Z");
+function buildBoard(){
+  cols = narrow.matches ? NARROW_COLS : WIDE;
+  rows = narrow.matches ? NARROW_ROWS : 1;
+  flaps.style.setProperty('--cells', cols);
+  flaps.innerHTML = Array.from({length: cols * rows}, () =>
+    '<div class="flap blank"><span class="ch"></span></div>').join('');
+  cells = [...flaps.children].map(el => ({
+    el, ch: el.firstElementChild, at: 0, token: 0
+  }));
 }
 
-function ordered(list){
-  const by = (a, b) => a.place.localeCompare(b.place, "en", { sensitivity: "base" });
-  if (order === "asc")  return [...list].sort(by);
-  if (order === "desc") return [...list].sort((a, b) => by(b, a));
-  if (order === "shuffle") {
-    const seat = d => bag.indexOf(DRINKS.indexOf(d));
-    return [...list].sort((a, b) => seat(a) - seat(b));
+/* Break on spaces, not mid-word — a board that splits "CHOCO/LATE"
+   reads as broken rather than mechanical. */
+function layoutName(name){
+  if(rows === 1) return name.padEnd(cols).slice(0, cols).split('');
+
+  const lines = [];
+  let cur = '';
+  for(const word of name.split(' ')){
+    if(!cur) cur = word;
+    else if((cur + ' ' + word).length <= cols) cur += ' ' + word;
+    else { lines.push(cur); cur = word; }
+    while(cur.length > cols){ lines.push(cur.slice(0, cols)); cur = cur.slice(cols); }
   }
-  return list;
+  if(cur) lines.push(cur);
+
+  const out = [];
+  for(let r = 0; r < rows; r++){
+    out.push(...(lines[r] || '').padEnd(cols).slice(0, cols).split(''));
+  }
+  return out;
 }
 
-/* ---------- render ---------- */
-function render(){
-  const kindOf = active === "All" ? DRINKS : DRINKS.filter(d => d.kind === active);
-  const list = ordered(kindOf);
+buildBoard();
 
-  countEl.textContent = list.length + (list.length === 1 ? " cup" : " cups");
+function show(cell, idx){
+  const glyph = DRUM[idx];
+  cell.at = idx;
+  cell.ch.textContent = glyph === ' ' ? '' : glyph;
+  cell.el.classList.toggle('blank', glyph === ' ');
+}
 
-  // clear everything except the intro tile
-  [...grid.children].forEach(c => { if (c !== intro) c.remove(); });
+function turnTo(cell, target, delay){
+  const to = DRUM.indexOf(target);
+  const token = ++cell.token;
 
-  list.forEach((d, i) => {
-    const li = document.createElement("li");
-    li.className = "tile cup " + TONES[i % TONES.length];
+  if(to < 0){                       // glyph isn't on the drum — just set it
+    cell.ch.textContent = target;
+    cell.el.classList.remove('blank');
+    return;
+  }
+  if(to === cell.at) return;
+  if(reduced.matches){ show(cell, to); return; }
 
-    const slug = d.place.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-    const panelId = "addr-" + slug;
-    const isOpen = opened.has(d.place);
-    if (isOpen) li.classList.add("open");
+  let steps = (to - cell.at + DRUM.length) % DRUM.length;
 
-    const sub = [d.drink, d.city].filter(Boolean).join(" · ");
-    const maps = "https://www.google.com/maps/search/?api=1&query=" +
-                 encodeURIComponent(d.place + " " + (d.address || ""));
+  setTimeout(function tick(){
+    if(cell.token !== token) return;              // a newer selection won
+    show(cell, (cell.at + 1) % DRUM.length);
+    cell.el.classList.remove('turning');
+    void cell.el.offsetWidth;                     // restart the animation
+    cell.el.classList.add('turning');
+    if(--steps > 0) setTimeout(tick, STEP);
+  }, delay);
+}
 
-    li.innerHTML = `
-      <button class="cupbtn" type="button"
-              aria-expanded="${isOpen}" aria-controls="${panelId}">
-        <span class="stage">
-          <img src="${d.image}" alt="Illustration of a ${d.drink.toLowerCase()} cup from ${d.place}" loading="lazy">
-        </span>
-        ${sub ? `<p class="kicker">${sub}</p>` : ""}
-        <h2 class="place">${d.place}</h2>
-        ${d.rank ? `<span class="rank">#${d.rank} ${d.kind}</span>` : ""}
-        ${d.note ? `<p class="note">${d.note}</p>` : ""}
-        <span class="addr" id="${panelId}">
-          <span><p>${d.address ? `<a href="${maps}" target="_blank" rel="noopener">${d.address}</a>` : ""}</p></span>
-        </span>
-      </button>`;
-
-    if (d.address) {
-      const btn = li.querySelector(".cupbtn");
-      btn.addEventListener("click", e => {
-        if (e.target.closest("a")) return;   // let the maps link through
-        const open = li.classList.toggle("open");
-        btn.setAttribute("aria-expanded", String(open));
-        open ? opened.add(d.place) : opened.delete(d.place);
-      });
+function setBoard(place, instant){
+  document.getElementById('board-sr').textContent = place.place;
+  const glyphs = layoutName(place.place.toUpperCase());
+  glyphs.forEach((g, i) => {
+    if(instant){
+      const at = DRUM.indexOf(g);
+      if(at < 0){ cells[i].ch.textContent = g; cells[i].el.classList.remove('blank'); }
+      else show(cells[i], at);
+    } else {
+      turnTo(cells[i], g, i * LAG);
     }
-
-    grid.appendChild(li);
   });
-
-  const outro = document.createElement("li");
-  outro.className = "tile outro";
-  outro.innerHTML = `
-    <p class="kicker">Still sipping</p>
-    <p class="line">More cups as I drink them.</p>`;
-  grid.appendChild(outro);
 }
 
-syncTools();
-render();
+/* re-cut the board when the layout flips between one row and two */
+narrow.addEventListener('change', () => {
+  buildBoard();
+  setBoard(PLACES[selected], true);
+});
+
+function setReadout(p){
+  const bits = ['Hot chocolate', p.address];
+  if(p.height) bits.push(`${Math.round(p.height)} m`);
+  bits.push(p.visits > 1 ? `${p.visits} visits` : '1 visit');
+  const el = document.getElementById('readout');
+  el.innerHTML = bits.map(b => `<span>${b}</span>`).join('')
+    + (p.closed ? '<span class="shut">Now closed</span>' : '');
+}
+
+/* ----------------------------------------------------------------- MAP */
+const map = new maplibregl.Map({
+  container:'map',
+  center:[-73.9885, 40.7480],
+  zoom:13, pitch:50, bearing:-18,
+  attributionControl:{ compact:true },
+  style:{
+    version:8,
+    sources:{ omt:{ type:'vector', url:'https://tiles.openfreemap.org/planet' } },
+    layers:[
+      { id:'bg', type:'background', paint:{ 'background-color':'#ffffff' } },
+      { id:'water', type:'fill', source:'omt', 'source-layer':'water',
+        paint:{ 'fill-color':'#f7f7f7' } },
+      { id:'park', type:'fill', source:'omt', 'source-layer':'park',
+        paint:{ 'fill-color':'#fcfcfc' } },
+      { id:'roads', type:'line', source:'omt', 'source-layer':'transportation',
+        filter:['!=',['get','brunnel'],'tunnel'],
+        paint:{ 'line-color':'#ededed',
+                'line-width':['interpolate',['linear'],['zoom'], 11,0.4, 16,2] } },
+      { id:'buildings-flat', type:'fill', source:'omt', 'source-layer':'building',
+        minzoom:13,
+        paint:{ 'fill-color':'#f4f4f4', 'fill-outline-color':'#ececec' } }
+    ]
+  }
+});
+map.addControl(new maplibregl.NavigationControl({ visualizePitch:true }), 'top-right');
+
+map.on('load', () => {
+  map.addSource('sips', {
+    type:'geojson',
+    data:{ type:'FeatureCollection', features: PLACES.map((p,i)=>({
+      type:'Feature',
+      geometry:{ type:'Point', coordinates:[p.lng,p.lat] },
+      properties:{ i, place:p.place }
+    })) }
+  });
+
+  map.addSource('sip-buildings', { type:'geojson', data:{ type:'FeatureCollection', features:[] } });
+
+  map.addLayer({
+    id:'sip-buildings', type:'fill-extrusion', source:'sip-buildings',
+    paint:{
+      'fill-extrusion-height':['get','height'],
+      'fill-extrusion-base':0,
+      'fill-extrusion-opacity':0.96,
+      'fill-extrusion-color':[
+        'case', ['==',['get','i'],['literal',0]], '#141414',
+        ['interpolate',['linear'],['get','height'],
+          0,'#d4d4d4', 40,'#b8b8b8', 120,'#989898', 250,'#7a7a7a']
+      ]
+    }
+  });
+
+  map.addLayer({ id:'sip-halo', type:'circle', source:'sips',
+    paint:{ 'circle-radius':12, 'circle-color':'#141414', 'circle-opacity':0.06 } });
+
+  map.addLayer({ id:'sip', type:'circle', source:'sips',
+    paint:{
+      'circle-radius':5,
+      'circle-color':['case',['==',['get','i'],['literal',0]],'#141414','#ffffff'],
+      'circle-stroke-width':1.5,
+      'circle-stroke-color':'#141414'
+    } });
+
+  map.on('click','sip', e => { select(e.features[0].properties.i, true); closeMap(); });
+  map.on('mouseenter','sip', ()=> map.getCanvas().style.cursor='pointer');
+  map.on('mouseleave','sip', ()=> map.getCanvas().style.cursor='');
+
+  loadSipBuildings();
+  mapReady = true;
+  overview(false);
+  select(0, false);
+});
+
+/* Real footprints from NYC Open Data — intersects() returns the single
+   building the pin stands in. height_roof is feet above grade. */
+const FOOTPRINTS = 'https://data.cityofnewyork.us/resource/5zhs-2jue.geojson';
+
+async function footprintAt(p, i){
+  const url = FOOTPRINTS
+    + '?$select=' + encodeURIComponent('the_geom,height_roof')
+    + '&$where=' + encodeURIComponent(`intersects(the_geom, 'POINT(${p.lng} ${p.lat})')`);
+  try{
+    const r = await fetch(url);
+    if(!r.ok) return null;
+    const f = (await r.json()).features?.[0];
+    if(!f) return null;
+    const ft = parseFloat(f.properties.height_roof);
+    const height = (isFinite(ft) && ft > 0 ? ft : 40) * 0.3048;
+    p.height = height;
+    return { type:'Feature', geometry:f.geometry, properties:{ i, place:p.place, height } };
+  }catch(e){ return null; }
+}
+
+async function loadSipBuildings(){
+  const found = (await Promise.all(PLACES.map(footprintAt))).filter(Boolean);
+  map.getSource('sip-buildings')?.setData({ type:'FeatureCollection', features:found });
+  setReadout(PLACES[selected]);          // heights have arrived
+}
+
+function paintPins(){
+  if(!map.getLayer('sip')) return;
+  map.setPaintProperty('sip','circle-color',
+    ['case',['==',['get','i'],['literal',selected]],'#141414','#ffffff']);
+}
+
+function paintBuildings(){
+  if(!map.getLayer('sip-buildings')) return;
+  map.setPaintProperty('sip-buildings','fill-extrusion-color',[
+    'case', ['==',['get','i'],['literal',selected]], '#141414',
+    ['interpolate',['linear'],['get','height'],
+      0,'#d4d4d4', 40,'#b8b8b8', 120,'#989898', 250,'#7a7a7a']
+  ]);
+}
+
+function overview(animate){
+  const b = PLACES.reduce((acc,p)=>acc.extend([p.lng,p.lat]),
+    new maplibregl.LngLatBounds([PLACES[0].lng,PLACES[0].lat],[PLACES[0].lng,PLACES[0].lat]));
+  map.fitBounds(b, {
+    padding:{ top:44, bottom:44, left:36, right:36 },
+    pitch:48, bearing:-18, maxZoom:14,
+    duration: animate ? 900 : 0
+  });
+}
+document.getElementById('all').addEventListener('click', ()=> overview(true));
+
+/* ----------------------------------------------------- MAP AS A SCREEN
+   On a phone the map is somewhere you go, pick a place, and come back
+   from — so opening it is a push and tapping a pin is the way home. */
+const deckMap = document.getElementById('deck-map');
+const fab     = document.getElementById('open-map');
+
+function openMap(){
+  if(!narrow.matches) return;
+  deckMap.classList.add('open');
+  deckMap.setAttribute('aria-hidden','false');
+  document.getElementById('close-map').focus();
+  map.resize();
+  setTimeout(()=> map.resize(), 320);   // again once the slide has landed
+}
+
+function closeMap(){
+  if(!deckMap.classList.contains('open')) return;
+  deckMap.classList.remove('open');
+  deckMap.setAttribute('aria-hidden','true');
+  fab.focus();
+}
+
+fab.addEventListener('click', openMap);
+document.getElementById('close-map').addEventListener('click', closeMap);
+addEventListener('keydown', e => { if(e.key === 'Escape') closeMap(); });
+narrow.addEventListener('change', () => {
+  if(!narrow.matches) closeMap();
+  deckMap.setAttribute('aria-hidden','false');
+  map.resize();
+});
+
+/* ---------------------------------------------------------------- LIST */
+const list = document.getElementById('list');
+document.getElementById('count').textContent = PLACES.length;
+const tally = document.getElementById('tally');
+function setTally(){
+  tally.textContent = narrow.matches
+    ? `${PLACES.length} cups`
+    : `${PLACES.length} cups · Manhattan & Jersey City`;
+}
+setTally();
+narrow.addEventListener('change', setTally);
+
+list.innerHTML = PLACES.map((p,i)=>`
+  <button class="row" role="option" aria-selected="${i===0}" data-i="${i}">
+    <span>
+      <span class="row-name">${p.place}</span>
+      <span class="row-where">${p.address}${p.closed?' · closed':''}</span>
+    </span>
+    ${p.visits>1?`<span class="row-visits">×${p.visits}</span>`:''}
+  </button>`).join('');
+
+list.querySelectorAll('.row').forEach(r =>
+  r.addEventListener('click', ()=> select(+r.dataset.i, true)));
+
+function select(i, fly){
+  selected = i;
+  const p = PLACES[i];
+  list.querySelectorAll('.row').forEach(r =>
+    r.setAttribute('aria-selected', +r.dataset.i === i));
+  setBoard(p);
+  setReadout(p);
+  paintPins();
+  paintBuildings();
+  if(window.setSleeve) window.setSleeve(p);
+  if(fly && mapReady) map.flyTo({ center:[p.lng,p.lat], zoom:15.4, pitch:58, duration:900 });
+}
 </script>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+const el = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+el.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+camera.position.set(2.1, 1.9, 2.9);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.target.set(0, 0.62, 0);
+controls.enablePan = false;
+controls.minDistance = 2.2;
+controls.maxDistance = 8;
+controls.maxPolarAngle = Math.PI * 0.52;
+controls.autoRotate = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+controls.autoRotateSpeed = 0.8;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xdedede, 2.5));
+const key = new THREE.DirectionalLight(0xffffff, 1.4);
+key.position.set(2.5, 4, 2.5);
+scene.add(key);
+
+/* paper cup: tapered lathe, outer wall down + inner wall up, sealed floor */
+const R_BOT = 0.42, R_TOP = 0.60, H = 1.24, WALL = 0.028;
+const prof = [];
+const N = 16;
+for (let i = 0; i <= N; i++){
+  const t = i / N;
+  prof.push(new THREE.Vector2(R_BOT + (R_TOP - R_BOT) * t, t * H));
+}
+prof.push(new THREE.Vector2(R_TOP + 0.035, H + 0.02));
+prof.push(new THREE.Vector2(R_TOP - WALL,  H - 0.01));
+for (let i = N; i >= 1; i--){
+  const t = i / N;
+  prof.push(new THREE.Vector2(R_BOT + (R_TOP - R_BOT) * t - WALL, Math.max(t * H, WALL)));
+}
+prof.push(new THREE.Vector2(0.001, WALL));
+
+const cup = new THREE.Mesh(
+  new THREE.LatheGeometry(prof, 64),
+  new THREE.MeshStandardMaterial({ color:0xf4f4f4, roughness:0.92, side:THREE.DoubleSide })
+);
+scene.add(cup);
+
+/* the chocolate */
+const FILL = H * 0.86;
+const rAt = y => R_BOT + (R_TOP - R_BOT) * (y / H) - WALL - 0.004;
+const liquid = new THREE.Mesh(
+  new THREE.CylinderGeometry(rAt(FILL), rAt(FILL * 0.45), FILL * 0.55, 64),
+  new THREE.MeshStandardMaterial({ color:0x4a2c1d, roughness:0.34, metalness:0.05 })
+);
+liquid.position.y = FILL - (FILL * 0.55) / 2;
+scene.add(liquid);
+
+/* The printed wrap. Artwork is 1400x428, so size the band to that aspect
+   against the cup's circumference — otherwise the lettering stretches. */
+const ART_AR = 1400 / 428;
+const rOut = y => R_BOT + (R_TOP - R_BOT) * (y / H) + 0.008;
+const wrapMid = H * 0.52;
+const wrapH   = Math.min(2 * Math.PI * rOut(wrapMid) / ART_AR, H * 0.94);
+const wrapTop = Math.min(wrapMid + wrapH / 2, H - 0.03);
+const wrapBot = Math.max(wrapTop - wrapH, 0.02);
+
+const wrapMat = new THREE.MeshStandardMaterial({
+  color:0xdcdcdc, roughness:0.9, side:THREE.DoubleSide
+});
+const wrap = new THREE.Mesh(
+  new THREE.CylinderGeometry(rOut(wrapTop), rOut(wrapBot), wrapTop - wrapBot, 96, 1, true),
+  wrapMat
+);
+wrap.position.y = (wrapTop + wrapBot) / 2;
+/* cylinder UVs start at +Z, so the artwork's centre lands on the back */
+wrap.rotation.y = Math.PI + Math.atan2(camera.position.x, camera.position.z);
+scene.add(wrap);
+
+const disc = new THREE.Mesh(
+  new THREE.CircleGeometry(0.95, 64),
+  new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:0.04 })
+);
+disc.rotation.x = -Math.PI / 2;
+disc.position.y = 0.001;
+scene.add(disc);
+
+const texLoader = new THREE.TextureLoader();
+const texCache  = new Map();
+const maxAniso  = renderer.capabilities.getMaxAnisotropy();
+
+function sleeveTexture(slug){
+  if(!slug) return null;
+  if(!texCache.has(slug)){
+    const t = texLoader.load(`assets/hot-chocolates/${slug}.png`);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.wrapS = THREE.RepeatWrapping;
+    t.anisotropy = maxAniso;
+    texCache.set(slug, t);
+  }
+  return texCache.get(slug);
+}
+
+window.setSleeve = place => {
+  const t = sleeveTexture(place && place.sleeve);
+  wrapMat.map = t;
+  wrapMat.color.set(t ? 0xffffff : 0xdcdcdc);
+  wrapMat.needsUpdate = true;
+};
+window.setSleeve(PLACES[selected]);
+
+/* fit the cup to whichever pane dimension is tighter */
+function fit(){
+  const w = el.clientWidth, h = el.clientHeight;
+  if(!w || !h) return;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  const R = 1.25;
+  const vFov = camera.fov * Math.PI / 180;
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  camera.position.setLength(R / Math.tan(Math.min(vFov, hFov) / 2) * 1.15);
+}
+new ResizeObserver(fit).observe(el);
+addEventListener('resize', fit);
+fit();
+
+(function tick(){
+  requestAnimationFrame(tick);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+
 </body>
 </html>

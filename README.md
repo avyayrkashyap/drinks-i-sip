@@ -1,14 +1,47 @@
 # Drinks I Sip
 
-A shelf of drinks I've had, drawn one cup at a time — hot chocolates, coffees,
-cocktails, beers. Click a cup to see where it came from.
+Hot chocolates and other drinks I've had around New York, on a map and on a
+shelf. Two pages, no build step, no dependencies.
 
-Static site: one `index.html`, no build step, no dependencies.
+| Page | What it is |
+| --- | --- |
+| `index.html` | The board — a split-flap display, a 3D map of the buildings I drank in, and a paper cup wearing each place's sleeve. |
+| `drawings.html` | The original shelf — one hand-drawn cup per drink, filterable by kind. |
 
-## Adding a drink
+## The board (`index.html`)
 
-Drop the illustration in `assets/`, then add a block to the `DRINKS` array in
-`index.html`:
+Add a place to the `PLACES` array:
+
+```js
+{
+  place:   "Dante",
+  address: "550 Hudson St",
+  lat:     40.7300,
+  lng:     -74.0040,
+  visits:  1,
+  sleeve:  "dante",   // optional
+  closed:  false      // optional
+}
+```
+
+`lat`/`lng` are looked up once by hand — right-click the storefront in Google
+Maps and copy the coordinates. Don't geocode at runtime.
+
+The building each pin stands in is fetched from NYC Open Data at load, so
+places outside the city (or in a park, with no footprint) show a pin but no 3D
+building. Nothing to configure — it either matches or it doesn't.
+
+`sleeve` points at `assets/hot-chocolates/<slug>.png`, a **1400×428** image that
+wraps the cup. Without one the cup wears a plain grey band.
+
+Data and tiles: [OpenFreeMap](https://openfreemap.org/) for the basemap
+(attribution is required and rendered on the map), and NYC Open Data's
+[Building Footprints](https://data.cityofnewyork.us/City-Government/Building-Footprints/5zhs-2jue)
+for the extrusions.
+
+## The shelf (`drawings.html`)
+
+Drop the illustration in `assets/`, then add a block to the `DRINKS` array:
 
 ```js
 {
@@ -32,3 +65,6 @@ empty and they simply don't render. A cup without an `address` isn't clickable.
 ```
 python3 -m http.server 8000
 ```
+
+Both pages need to be served over HTTP — opening the file directly breaks the
+map tiles and the footprint lookup.

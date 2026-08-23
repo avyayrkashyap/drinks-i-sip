@@ -1,0 +1,444 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Drinks I Sip</title>
+<meta name="description" content="My digital shelf of some cups and glasses I've liked enough to draw.">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Inter:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root{
+    --ink:#1a1414;
+    --page:#fff;
+    --radius:12px;
+    --gap:14px;
+
+    /* palette lifted from the reference */
+    --cream:#fef6e9;
+    --amber:#ffb567;
+    --salmon:#ffb8a4;
+    --stone:#d9d9d9;
+    --teal:#003f48;
+    --rust:#e73d00;
+
+    --serif:"Instrument Serif",ui-serif,Georgia,"Times New Roman",serif;
+    --sans:"Inter",-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
+  }
+  *{box-sizing:border-box}
+  html{-webkit-text-size-adjust:100%}
+  body{
+    margin:0;
+    padding:var(--gap);
+    background:var(--page);
+    color:var(--ink);
+    font-family:var(--sans);
+    font-size:16px;
+    line-height:1.4;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- bento grid ---------- */
+  .grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:var(--gap);
+    list-style:none;margin:0;padding:0;
+  }
+  .tile{
+    position:relative;
+    border-radius:var(--radius);
+    padding:26px;
+    display:flex;
+    flex-direction:column;
+    overflow:hidden;
+  }
+
+  /* ---------- intro tile ---------- */
+  .intro{
+    grid-column:span 2;
+    background:var(--cream);
+    min-height:430px;
+    justify-content:space-between;
+    gap:28px;
+  }
+  .wordmark{
+    font-family:var(--sans);
+    font-size:14px;font-weight:500;letter-spacing:-.01em;
+    margin:0;
+  }
+  .intro h1{
+    font-family:var(--serif);
+    font-weight:400;
+    font-size:clamp(46px,6.4vw,92px);
+    line-height:.94;
+    letter-spacing:-.02em;
+    margin:0 0 18px;
+  }
+  .tagline{
+    margin:0;max-width:44ch;
+    font-size:16.5px;line-height:1.45;
+    color:#5f5551;
+  }
+
+  /* ---------- controls ---------- */
+  .controls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+  .btn{
+    display:inline-flex;align-items:center;gap:7px;
+    font-family:var(--sans);font-size:11.5px;font-weight:500;
+    letter-spacing:.09em;text-transform:uppercase;
+    background:transparent;
+    border:1px solid rgba(26,20,20,.18);
+    border-radius:999px;
+    padding:8px 14px;
+    color:#5f5551;cursor:pointer;
+    transition:background .15s ease,color .15s ease,border-color .15s ease;
+  }
+  .btn:hover{border-color:var(--ink);color:var(--ink)}
+  .btn:focus-visible{outline:2px solid var(--ink);outline-offset:3px}
+  .btn[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:var(--cream)}
+  .btn svg{width:15px;height:15px;fill:currentColor;flex-shrink:0}
+  .rule{width:100%;height:1px;background:rgba(26,20,20,.14);margin:2px 0}
+  .count{
+    font-size:11.5px;letter-spacing:.09em;text-transform:uppercase;
+    color:#8b7f7c;margin:0;
+  }
+
+  /* ---------- cup tiles ---------- */
+  .cup{padding:0}
+  .cupbtn{
+    all:unset;
+    box-sizing:border-box;
+    display:flex;flex-direction:column;
+    width:100%;height:100%;
+    min-height:380px;
+    padding:26px;
+    cursor:pointer;
+  }
+  .cupbtn:focus-visible{outline:2px solid var(--ink);outline-offset:-6px;border-radius:var(--radius)}
+
+  .cup .stage{
+    flex:1;
+    display:flex;align-items:center;justify-content:center;
+    padding:6px 0 18px;
+    min-height:0;
+  }
+  .cup img{
+    max-width:78%;max-height:210px;
+    width:auto;height:auto;
+    object-fit:contain;
+    /* white artwork background dissolves into the tile colour */
+    mix-blend-mode:multiply;
+    transition:transform .3s cubic-bezier(.2,.7,.3,1);
+  }
+  .cupbtn:hover img{transform:translateY(-7px) rotate(-1.5deg)}
+
+  .kicker{
+    font-size:11px;font-weight:500;letter-spacing:.11em;text-transform:uppercase;
+    opacity:.62;margin:0 0 7px;
+  }
+  .place{
+    font-family:var(--serif);font-weight:400;
+    font-size:clamp(27px,2.5vw,40px);
+    line-height:1;letter-spacing:-.015em;
+    margin:0;
+  }
+  .rank{
+    display:inline-block;margin-top:11px;
+    font-size:10.5px;font-weight:500;letter-spacing:.1em;text-transform:uppercase;
+    border:1px solid currentColor;border-radius:999px;padding:4px 9px;opacity:.7;
+  }
+  .note{
+    margin:10px 0 0;max-width:30ch;
+    font-size:13.5px;line-height:1.45;font-style:italic;opacity:.72;
+  }
+
+  /* address reveal */
+  .addr{
+    display:grid;grid-template-rows:0fr;
+    transition:grid-template-rows .3s ease;
+  }
+  .cup.open .addr{grid-template-rows:1fr}
+  .addr > *{display:block;overflow:hidden;min-height:0}
+  .addr p{
+    margin:14px 0 0;padding-top:13px;
+    border-top:1px solid rgba(26,20,20,.2);
+    font-size:13.5px;line-height:1.45;max-width:28ch;
+  }
+  .addr a{color:inherit;text-decoration:none;border-bottom:1px solid rgba(26,20,20,.35)}
+  .addr a:hover{border-bottom-color:currentColor}
+
+  /* tile colours */
+  .c-amber{background:var(--amber)}
+  .c-salmon{background:var(--salmon)}
+  .c-cream{background:var(--cream)}
+  .c-stone{background:var(--stone)}
+
+  /* ---------- closing tile ---------- */
+  .outro{
+    grid-column:1/-1;
+    background:var(--teal);
+    color:var(--cream);
+    min-height:190px;
+    justify-content:flex-end;
+  }
+  .outro p.line{
+    font-family:var(--serif);
+    font-size:clamp(26px,3.4vw,44px);
+    line-height:1.05;letter-spacing:-.015em;
+    margin:0;max-width:20ch;
+  }
+  .outro .kicker{opacity:.7;margin-bottom:10px}
+
+  /* ---------- responsive ---------- */
+  @media (max-width:900px){
+    .grid{grid-template-columns:repeat(2,1fr)}
+    .intro{grid-column:span 2;min-height:0}
+  }
+  @media (max-width:620px){
+    :root{--gap:10px}
+    .grid{grid-template-columns:1fr}
+    .intro{grid-column:span 1}
+    .intro h1{font-size:clamp(42px,13vw,64px)}
+    .cupbtn{min-height:320px}
+    .tile,.cupbtn{padding:22px}
+  }
+</style>
+</head>
+<body>
+
+<ul class="grid" id="grid">
+  <li class="tile intro">
+    <p class="wordmark">Drinks I Sip</p>
+    <div>
+      <h1>Drinks<br>I Sip</h1>
+      <p class="tagline">My digital shelf of some cups and glasses I&rsquo;ve liked enough to draw &mdash; presented in no particular order.</p>
+    </div>
+    <div>
+      <div class="controls" style="margin-bottom:12px">
+        <button class="btn" id="shuffle" type="button" aria-pressed="false">
+          <!-- Material Icons: shuffle -->
+          <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg>
+          Shuffle
+        </button>
+        <button class="btn" id="sort" type="button" aria-pressed="false">
+          <!-- Material Icons: arrow_upward / arrow_downward -->
+          <svg id="sortIcon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z"/></svg>
+          <span id="sortLabel">A&ndash;Z</span>
+        </button>
+      </div>
+      <div class="rule"></div>
+      <nav class="controls" id="filters" aria-label="Filter by kind of drink" style="margin:12px 0 10px"></nav>
+      <p class="count" id="count"></p>
+    </div>
+  </li>
+</ul>
+
+<script>
+/* ------------------------------------------------------------------
+   THE LIST. Add a drink by copying one block.
+
+   image  – file in assets/
+   place  – where you had it
+   address– street address, revealed when the tile is clicked
+   drink  – what it was
+   kind   – "Hot Chocolate" | "Coffee" | "Cocktail" | "Beer" | ...
+            (filter buttons build themselves from these)
+   city   – optional, "" hides it
+   rank   – optional number, your ranking within its kind. null hides it
+   note   – optional one line. "" hides it
+
+   Tile colours are assigned by position, so the grid stays balanced
+   however many drinks you add.
+------------------------------------------------------------------- */
+const DRINKS = [
+  {
+    image: "assets/caffe-panna.png",
+    place: "Caffè Panna",
+    address: "77 Irving Pl, New York, NY 10003",
+    drink: "Hot Chocolate",
+    kind:  "Hot Chocolate",
+    city:  "",
+    rank:  null,
+    note:  ""
+  },
+  {
+    image: "assets/the-cocoa-store.png",
+    place: "The Cocoa Store",
+    address: "873 Broadway, 6th floor, New York, NY 10003",
+    drink: "Hot Chocolate",
+    kind:  "Hot Chocolate",
+    city:  "",
+    rank:  null,
+    note:  ""
+  },
+  {
+    image: "assets/amorino.png",
+    place: "Amorino",
+    address: "721 8th Ave, New York, NY 10036",
+    drink: "Hot Chocolate",
+    kind:  "Hot Chocolate",
+    city:  "",
+    rank:  null,
+    note:  ""
+  },
+  {
+    image: "assets/breads-bakery.png",
+    place: "Breads Bakery",
+    address: "18 E 16th St, New York, NY 10003",
+    drink: "Hot Chocolate",
+    kind:  "Hot Chocolate",
+    city:  "",
+    rank:  null,
+    note:  ""
+  }
+];
+
+/* Light tones only: the artwork is multiplied onto the tile, so a dark
+   background would swallow the line work. */
+const TONES = ["c-amber", "c-salmon", "c-stone", "c-cream"];
+
+const grid    = document.getElementById("grid");
+const filters = document.getElementById("filters");
+const countEl = document.getElementById("count");
+const intro   = document.querySelector(".intro");
+
+let active = "All";
+let order  = "default";        // "default" | "shuffle" | "asc" | "desc"
+let bag    = [];               // shuffled sequence of indices into DRINKS
+const opened = new Set();      // places whose address is showing, kept across re-sorts
+
+/* ---------- filters ---------- */
+const kinds = ["All", ...new Set(DRINKS.map(d => d.kind))];
+
+kinds.forEach(kind => {
+  const b = document.createElement("button");
+  b.className = "btn";
+  b.type = "button";
+  b.textContent = kind;
+  b.setAttribute("aria-pressed", String(kind === active));
+  b.addEventListener("click", () => {
+    active = kind;
+    [...filters.children].forEach(c =>
+      c.setAttribute("aria-pressed", String(c.textContent === kind))
+    );
+    render();
+  });
+  filters.appendChild(b);
+});
+
+/* ---------- shuffle + sort ---------- */
+const shuffleBtn = document.getElementById("shuffle");
+const sortBtn    = document.getElementById("sort");
+const sortLabel  = document.getElementById("sortLabel");
+const sortIcon   = document.getElementById("sortIcon");
+
+const ARROW_UP   = "M4 12l1.41 1.41L11 7.83V20h2V7.83l5.58 5.59L20 12l-8-8-8 8z";
+const ARROW_DOWN = "M20 12l-1.41-1.41L13 16.17V4h-2v12.17l-5.58-5.59L4 12l8 8 8-8z";
+
+shuffleBtn.addEventListener("click", () => {
+  // Fisher-Yates over the indices, so every cup can land anywhere
+  bag = DRINKS.map((_, i) => i);
+  for (let i = bag.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [bag[i], bag[j]] = [bag[j], bag[i]];
+  }
+  order = "shuffle";
+  syncTools();
+  render();
+});
+
+sortBtn.addEventListener("click", () => {
+  order = order === "asc" ? "desc" : "asc";
+  syncTools();
+  render();
+});
+
+function syncTools(){
+  shuffleBtn.setAttribute("aria-pressed", String(order === "shuffle"));
+  sortBtn.setAttribute("aria-pressed", String(order === "asc" || order === "desc"));
+  const desc = order === "desc";
+  sortLabel.innerHTML = desc ? "Z&ndash;A" : "A&ndash;Z";
+  sortIcon.firstElementChild.setAttribute("d", desc ? ARROW_DOWN : ARROW_UP);
+  sortBtn.setAttribute("aria-label",
+    desc ? "Sort by place, Z to A" : "Sort by place, A to Z");
+}
+
+function ordered(list){
+  const by = (a, b) => a.place.localeCompare(b.place, "en", { sensitivity: "base" });
+  if (order === "asc")  return [...list].sort(by);
+  if (order === "desc") return [...list].sort((a, b) => by(b, a));
+  if (order === "shuffle") {
+    const seat = d => bag.indexOf(DRINKS.indexOf(d));
+    return [...list].sort((a, b) => seat(a) - seat(b));
+  }
+  return list;
+}
+
+/* ---------- render ---------- */
+function render(){
+  const kindOf = active === "All" ? DRINKS : DRINKS.filter(d => d.kind === active);
+  const list = ordered(kindOf);
+
+  countEl.textContent = list.length + (list.length === 1 ? " cup" : " cups");
+
+  // clear everything except the intro tile
+  [...grid.children].forEach(c => { if (c !== intro) c.remove(); });
+
+  list.forEach((d, i) => {
+    const li = document.createElement("li");
+    li.className = "tile cup " + TONES[i % TONES.length];
+
+    const slug = d.place.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+    const panelId = "addr-" + slug;
+    const isOpen = opened.has(d.place);
+    if (isOpen) li.classList.add("open");
+
+    const sub = [d.drink, d.city].filter(Boolean).join(" · ");
+    const maps = "https://www.google.com/maps/search/?api=1&query=" +
+                 encodeURIComponent(d.place + " " + (d.address || ""));
+
+    li.innerHTML = `
+      <button class="cupbtn" type="button"
+              aria-expanded="${isOpen}" aria-controls="${panelId}">
+        <span class="stage">
+          <img src="${d.image}" alt="Illustration of a ${d.drink.toLowerCase()} cup from ${d.place}" loading="lazy">
+        </span>
+        ${sub ? `<p class="kicker">${sub}</p>` : ""}
+        <h2 class="place">${d.place}</h2>
+        ${d.rank ? `<span class="rank">#${d.rank} ${d.kind}</span>` : ""}
+        ${d.note ? `<p class="note">${d.note}</p>` : ""}
+        <span class="addr" id="${panelId}">
+          <span><p>${d.address ? `<a href="${maps}" target="_blank" rel="noopener">${d.address}</a>` : ""}</p></span>
+        </span>
+      </button>`;
+
+    if (d.address) {
+      const btn = li.querySelector(".cupbtn");
+      btn.addEventListener("click", e => {
+        if (e.target.closest("a")) return;   // let the maps link through
+        const open = li.classList.toggle("open");
+        btn.setAttribute("aria-expanded", String(open));
+        open ? opened.add(d.place) : opened.delete(d.place);
+      });
+    }
+
+    grid.appendChild(li);
+  });
+
+  const outro = document.createElement("li");
+  outro.className = "tile outro";
+  outro.innerHTML = `
+    <p class="kicker">Still sipping</p>
+    <p class="line">More cups as I drink them.</p>`;
+  grid.appendChild(outro);
+}
+
+syncTools();
+render();
+</script>
+</body>
+</html>
