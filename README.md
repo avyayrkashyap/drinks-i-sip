@@ -19,6 +19,8 @@ Add a place to the `PLACES` array:
   lat:     40.7300,
   lng:     -74.0040,
   visits:  1,
+  score:   8.33,      // out of 10
+  price:   6.50,      // optional, in £
   sleeve:  "dante",   // optional
   closed:  false      // optional
 }
