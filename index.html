@@ -415,7 +415,7 @@ function setReadout(p){
     + (p.closed ? '<span class="shut">Now closed</span>' : '');
 
   document.getElementById('plate-score').textContent = p.score.toFixed(1);
-  document.getElementById('plate-price').textContent = p.price ? `£${p.price.toFixed(2)}` : '';
+  document.getElementById('plate-price').textContent = p.price ? `$${p.price.toFixed(2)}` : '';
 }
 
 /* ----------------------------------------------------------------- MAP */
@@ -595,7 +595,7 @@ list.innerHTML = PLACES.map((p,i)=>`
     </span>
     <span class="row-meta">
       <span class="row-score">${p.score.toFixed(1)}</span>
-      ${p.price ? `<span class="row-price">£${p.price.toFixed(2)}</span>` : ''}
+      ${p.price ? `<span class="row-price">$${p.price.toFixed(2)}</span>` : ''}
     </span>
   </button>`).join('');
 
