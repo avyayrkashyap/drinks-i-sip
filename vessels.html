@@ -1,0 +1,527 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cup configurator</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="places.js"></script>
+<script src="cups.js"></script>
+<style>
+  :root{
+    --paper:#fff; --rule:#e7e7e7; --mute:#9b9b9b; --graphite:#6b6b6b; --ink:#141414;
+    --pad:14px; --card:4px;
+    --ui:"Archivo",system-ui,sans-serif; --mono:"IBM Plex Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;height:100vh;overflow:hidden;background:var(--paper);color:var(--ink);
+       font-family:var(--ui);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
+
+  .frame{height:100vh;padding:var(--pad);display:grid;grid-template-rows:auto 1fr;gap:var(--pad)}
+  .masthead{display:flex;justify-content:space-between;align-items:baseline;
+            font-family:var(--mono);font-size:11px;font-weight:500;
+            letter-spacing:.16em;text-transform:uppercase}
+  .masthead .tally{color:var(--mute)}
+  .dirty{color:var(--ink)}
+  .dirty:not(:empty){margin-right:10px}
+  .dirty:not(:empty)::after{content:" ·";color:var(--rule)}
+
+  .decks{display:grid;grid-template-columns:250px 1fr 260px;gap:var(--pad);min-height:0}
+  .deck{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;
+        border:1px solid var(--rule);border-radius:var(--card)}
+  .deck-head{flex:none;display:flex;justify-content:space-between;align-items:center;
+             padding:11px 13px 9px;font-family:var(--mono);font-size:10.5px;font-weight:500;
+             letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+
+  /* places */
+  .list{flex:1;min-height:0;overflow-y:auto;padding-bottom:8px}
+  .row{width:100%;text-align:left;background:none;border:0;font:inherit;color:inherit;
+       cursor:pointer;padding:7px 13px 7px 11px;border-left:2px solid transparent;display:block}
+  .row:hover{background:#fafafa}
+  .row[aria-selected="true"]{border-left-color:var(--ink);background:#f7f7f7}
+  .row-name{font-size:13.5px;font-weight:500;display:block}
+  .row[aria-selected="true"] .row-name{font-weight:600}
+  .row-cfg{display:block;margin-top:1px;font-family:var(--mono);font-size:9.5px;
+           letter-spacing:.08em;text-transform:uppercase;color:var(--mute)}
+  .row-cfg.unset{color:#c9c9c9}
+
+  /* stage */
+  #stage{flex:1;min-height:0}
+
+  /* controls */
+  .panel{flex:1;min-height:0;overflow-y:auto;padding:2px 13px 16px}
+  .field{margin-bottom:16px}
+  .field>label{display:block;margin-bottom:6px;font-family:var(--mono);font-size:9.5px;
+               letter-spacing:.14em;text-transform:uppercase;color:var(--mute)}
+  .chips{display:flex;flex-wrap:wrap;gap:4px}
+  button.chip{font-family:var(--mono);font-size:10px;letter-spacing:.08em;text-transform:uppercase;
+        background:none;border:1px solid var(--rule);border-radius:2px;padding:4px 8px;
+        cursor:pointer;color:var(--graphite)}
+  button.chip[aria-pressed="true"]{background:var(--ink);border-color:var(--ink);color:#fff}
+  button.chip:hover:not([aria-pressed="true"]){color:var(--ink);border-color:#cfcfcf}
+
+  .slider{display:flex;align-items:center;gap:9px}
+  input[type=range]{flex:1;accent-color:var(--ink);min-width:0}
+  .val{font-family:var(--mono);font-size:11px;min-width:34px;text-align:right;
+       font-variant-numeric:tabular-nums}
+  .field[data-disabled="true"]{opacity:.35;pointer-events:none}
+  .hint{margin-top:5px;font-family:var(--mono);font-size:9px;letter-spacing:.08em;
+        text-transform:uppercase;color:var(--mute)}
+
+  .ax{font-family:var(--mono);font-size:9.5px;color:var(--mute);width:9px}
+  .swatch{height:22px;margin-top:7px;border:1px solid var(--rule);border-radius:2px}
+  .swatch-label{font-family:var(--mono);font-size:9px;color:var(--graphite);
+                letter-spacing:.06em;text-transform:none;margin-left:6px}
+  .out{width:100%;height:120px;resize:vertical;border:1px solid var(--rule);border-radius:2px;
+       font-family:var(--mono);font-size:9.5px;line-height:1.5;padding:8px;color:var(--graphite);
+       background:#fcfcfc}
+  .actions{display:flex;gap:5px;margin-top:7px}
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <header class="masthead">
+    <span>Cup configurator</span>
+    <span class="tally"><span id="dirty" class="dirty"></span><span id="tally"></span></span>
+  </header>
+
+  <div class="decks">
+
+    <section class="deck">
+      <div class="deck-head"><span>Places</span><span id="count-set"></span></div>
+      <div class="list" id="list"></div>
+    </section>
+
+    <section class="deck">
+      <div class="deck-head">
+        <span id="stage-label">Cup</span>
+        <span>
+          <button class="chip" id="toggle-profile" aria-pressed="false">Profile</button>
+          <button class="chip" id="toggle-spin" aria-pressed="true">Spin</button>
+        </span>
+      </div>
+      <div id="stage"></div>
+    </section>
+
+    <section class="deck">
+      <div class="deck-head"><span>Settings</span></div>
+      <div class="panel">
+        <div class="field">
+          <label>Glass</label>
+          <div class="chips" id="vessels"></div>
+        </div>
+        <div class="field">
+          <label>Finish <span id="finish-note" class="swatch-label"></span></label>
+          <div class="chips" id="finishes"></div>
+        </div>
+        <div class="field">
+          <label>Label <span id="label-note" class="swatch-label"></span></label>
+          <div class="chips" id="labels"></div>
+        </div>
+        <div class="field">
+          <label>Marshmallow</label>
+          <div class="chips" id="mallows"></div>
+        </div>
+        <div class="field">
+          <label>Count</label>
+          <div class="slider">
+            <input type="range" id="count" min="0" max="14" step="1">
+            <span class="val" id="count-val"></span>
+          </div>
+        </div>
+        <div class="field">
+          <label>Size</label>
+          <div class="slider">
+            <input type="range" id="size" min="0.4" max="2.2" step="0.05">
+            <span class="val" id="size-val"></span>
+          </div>
+        </div>
+        <div class="field" id="tilt-field">
+          <label>Tilt</label>
+          <div class="slider">
+            <input type="range" id="tilt" min="-90" max="90" step="1">
+            <span class="val" id="tilt-val"></span>
+          </div>
+          <div class="hint" id="tilt-hint"></div>
+        </div>
+        <div class="field">
+          <label>Liquid <span id="hex" class="swatch-label"></span></label>
+          <div class="slider"><span class="ax">L</span>
+            <input type="range" id="l" min="0.08" max="0.95" step="0.005">
+            <span class="val" id="l-val"></span></div>
+          <div class="slider"><span class="ax">C</span>
+            <input type="range" id="c" min="0" max="0.33" step="0.002">
+            <span class="val" id="c-val"></span></div>
+          <div class="slider"><span class="ax">H</span>
+            <input type="range" id="h" min="0" max="360" step="1">
+            <span class="val" id="h-val"></span></div>
+          <div class="swatch" id="swatch"></div>
+        </div>
+
+        <div class="field">
+          <label>places.js</label>
+          <textarea class="out" id="out" readonly spellcheck="false"></textarea>
+          <div class="actions">
+            <button class="chip" id="save">Save to cups.js</button>
+            <button class="chip" id="copy">Copy</button>
+            <button class="chip" id="reset">Reset this place</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { VESSELS, MALLOWS, buildCup, DEFAULT_CUP, LABEL_MODES, labelModeFor,
+         FINISHES, finishFor,
+         DEFAULT_LIQUID, setLiquid, oklchToHex } from './cup.js';
+
+const STORE = 'drinks-i-sip.cups';
+
+/* On every load the truth is cups.js — what the site actually ships.
+   localStorage is only a scratch mirror so the board can preview
+   unsaved edits; it never seeds this page, or you'd be editing against
+   a version of the site that no longer exists. */
+const config = {};
+PLACES.forEach(p => { if(p.cup) config[p.place] = { ...DEFAULT_CUP, ...DEFAULT_LIQUID, ...p.cup }; });
+localStorage.setItem(STORE, JSON.stringify(config));
+
+let dirty = false;
+function markDirty(on){
+  dirty = on;
+  document.getElementById('dirty').textContent = on ? 'unsaved' : '';
+}
+
+/* a one-click save is no excuse for silently binning someone's work */
+addEventListener('beforeunload', e => { if(dirty) e.preventDefault(); });
+
+let selected = PLACES[0].place;
+/* always merge over the defaults, so entries saved before a field
+   existed don't come back with holes in them */
+const cfgFor = name => ({ ...DEFAULT_CUP, ...DEFAULT_LIQUID, ...(config[name] || {}) });
+const isSet  = name => !!config[name];
+
+/* ── scene ────────────────────────────────────────────────────────── */
+const el = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+el.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(36, 1, .1, 100);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enablePan = false;
+controls.autoRotate = true;
+controls.autoRotateSpeed = .8;
+controls.maxPolarAngle = Math.PI * .54;
+
+scene.add(new THREE.HemisphereLight(0xffffff, 0xdedede, 2.5));
+const key = new THREE.DirectionalLight(0xffffff, 1.4);
+key.position.set(2.5, 4, 2.5);
+scene.add(key);
+
+const shadow = new THREE.Mesh(
+  new THREE.CircleGeometry(.95, 48),
+  new THREE.MeshBasicMaterial({ color:0x000000, transparent:true, opacity:.04 })
+);
+shadow.rotation.x = -Math.PI / 2;
+shadow.position.y = .001;
+scene.add(shadow);
+
+const texLoader = new THREE.TextureLoader();
+const texCache  = new Map();
+function sleeveTexture(slug){
+  if(!slug) return null;
+  if(!texCache.has(slug)){
+    const t = texLoader.load(`assets/hot-chocolates/${slug}.png`, () => render());
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    texCache.set(slug, t);
+  }
+  return texCache.get(slug);
+}
+
+let cup = null, profileLine = null, showProfile = false;
+
+function render(){
+  if(cup){ scene.remove(cup); disposeTree(cup); }
+  if(profileLine){ scene.remove(profileLine); profileLine.geometry.dispose(); }
+
+  const c = cfgFor(selected);
+  const place = PLACES.find(p => p.place === selected);
+  const azimuth = Math.atan2(camera.position.x - controls.target.x,
+                             camera.position.z - controls.target.z);
+
+  cup = buildCup({ ...c, labelTexture: sleeveTexture(place && place.sleeve), facing: azimuth });
+  scene.add(cup);
+  setLiquid(c);
+
+  const v = VESSELS[c.vessel];
+  profileLine = new THREE.Line(
+    new THREE.BufferGeometry().setFromPoints(v.profile.map(p => new THREE.Vector3(p.x, p.y, 0))),
+    new THREE.LineBasicMaterial({ color:0x141414 })
+  );
+  profileLine.position.z = .85;
+  profileLine.visible = showProfile;
+  scene.add(profileLine);
+
+  controls.target.set(0, v.h * .5, 0);
+  frame(v);
+}
+
+function disposeTree(o){
+  o.traverse(n => { if(n.geometry) n.geometry.dispose(); });
+}
+
+function frame(v){
+  const a = camera.aspect || 1;
+  const R = Math.max(v.h * .62, .8);
+  const vFov = camera.fov * Math.PI / 180;
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * a);
+  const d = R / Math.tan(Math.min(vFov, hFov) / 2) * 1.25;
+  const dir = new THREE.Vector3(.62, .55, .86).normalize();
+  camera.position.copy(controls.target).add(dir.multiplyScalar(d));
+  controls.update();
+}
+
+/* ── places list ──────────────────────────────────────────────────── */
+const list = document.getElementById('list');
+
+function summary(name){
+  if(!isSet(name)) return 'default';
+  const c = cfgFor(name);
+  const m = c.mallow === 'None' || !c.count ? 'no mallow'
+          : `${c.mallow} ×${c.count}${c.size !== 1 ? ` @${c.size}` : ''}`;
+  const fin = c.finish && c.finish !== 'auto' ? ` · ${c.finish}` : '';
+  const lab = c.label  && c.label  !== 'auto' ? ` · ${c.label}`  : '';
+  return `${c.vessel}${fin} · ${m}${lab}`;
+}
+
+function paintList(){
+  list.innerHTML = PLACES.map(p => `
+    <button class="row" data-name="${p.place.replace(/"/g,'&quot;')}"
+            aria-selected="${p.place === selected}">
+      <span class="row-name">${p.place}</span>
+      <span class="row-cfg${isSet(p.place) ? '' : ' unset'}">${summary(p.place)}</span>
+    </button>`).join('');
+  document.getElementById('count-set').textContent =
+    `${Object.keys(config).length}/${PLACES.length}`;
+}
+
+list.addEventListener('click', e => {
+  const r = e.target.closest('.row'); if(!r) return;
+  selected = r.dataset.name;
+  paintList(); paintControls(); render();
+  document.getElementById('stage-label').textContent = selected;
+});
+
+/* ── controls ─────────────────────────────────────────────────────── */
+function chips(hostId, names, key){
+  const host = document.getElementById(hostId);
+  const pretty = { auto:'Auto', wrap:'Wrap', patch:'Square', none:'None',
+                   glass:'Clear', solid:'White' };
+  host.innerHTML = names.map(n =>
+    `<button class="chip" data-v="${n}">${pretty[n] || n}</button>`).join('');
+  host.addEventListener('click', e => {
+    const b = e.target.closest('button'); if(!b) return;
+    update({ [key]: b.dataset.v });
+  });
+}
+chips('vessels', Object.keys(VESSELS), 'vessel');
+chips('mallows', Object.keys(MALLOWS), 'mallow');
+chips('labels', LABEL_MODES, 'label');
+chips('finishes', FINISHES, 'finish');
+
+function slider(id, key, fmt){
+  const input = document.getElementById(id);
+  input.addEventListener('input', () => update({ [key]: +input.value }));
+  return { input, out: document.getElementById(id + '-val'), fmt };
+}
+const sliders = {
+  count: slider('count', 'count', v => v),
+  size:  slider('size',  'size',  v => v.toFixed(2)),
+  tilt:  slider('tilt',  'tilt',  v => `${v}°`),
+  l:     slider('l',     'l',     v => v.toFixed(3)),
+  c:     slider('c',     'c',     v => v.toFixed(3)),
+  h:     slider('h',     'h',     v => `${v}°`)
+};
+
+function update(patch){
+  config[selected] = { ...cfgFor(selected), ...patch };
+  localStorage.setItem(STORE, JSON.stringify(config));
+  markDirty(true);
+
+  /* colour is a live uniform, so skip the rebuild for those three */
+  const colourOnly = Object.keys(patch).every(k => 'lch'.includes(k) && k.length === 1);
+  setLiquid(config[selected]);
+  paintList(); paintControls(); paintOut();
+  if(!colourOnly) render();
+}
+
+function paintControls(){
+  const c = cfgFor(selected);
+  document.querySelectorAll('#vessels .chip').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.v === c.vessel));
+  document.querySelectorAll('#mallows .chip').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.v === c.mallow));
+
+  for(const [k, s] of Object.entries(sliders)){
+    s.input.value = c[k];
+    s.out.textContent = s.fmt(c[k]);
+  }
+
+  /* Tilt only means anything on a single marshmallow — a scatter
+     already randomises its own lean. */
+  document.querySelectorAll('#finishes .chip').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.v === (c.finish || 'auto')));
+  document.getElementById('finish-note').textContent =
+    `auto = ${VESSELS[c.vessel].glass ? 'clear' : 'white'}`;
+
+  document.querySelectorAll('#labels .chip').forEach(b =>
+    b.setAttribute('aria-pressed', b.dataset.v === (c.label || 'auto')));
+
+  /* the label only shows if the place actually has artwork */
+  const place = PLACES.find(p => p.place === selected);
+  const art   = place && place.sleeve ? texCache.get(place.sleeve) : null;
+  const ar    = art && art.image && art.image.height ? art.image.width / art.image.height : null;
+  const mode  = labelModeFor(VESSELS[c.vessel], c, ar);
+  document.getElementById('label-note').textContent =
+    !place?.sleeve ? 'no artwork for this place'
+    : mode === 'none' ? ''
+    : `auto = ${labelModeFor(VESSELS[c.vessel], { label:'auto' }, ar)}`;
+
+  const hex = oklchToHex(c.l, c.c, c.h);
+  document.getElementById('swatch').style.background = hex;
+  document.getElementById('hex').textContent = hex;
+
+  const single = c.count === 1 && c.mallow !== 'None';
+  document.getElementById('tilt-field').dataset.disabled = !single;
+  document.getElementById('tilt-hint').textContent =
+    single ? '' : 'set count to 1';
+}
+
+/* ── export ───────────────────────────────────────────────────────── */
+function paintOut(){
+  const names = PLACES.map(p => p.place).filter(isSet);
+  const body = names.map(n => {
+    const c = cfgFor(n);
+    const bits = [`vessel:"${c.vessel}"`, `mallow:"${c.mallow}"`, `count:${c.count}`];
+    if(c.finish && c.finish !== 'auto') bits.push(`finish:"${c.finish}"`);
+    if(c.label && c.label !== 'auto') bits.push(`label:"${c.label}"`);
+    if(c.size !== 1) bits.push(`size:${c.size}`);
+    if(c.count === 1 && c.tilt) bits.push(`tilt:${c.tilt}`);
+    if(c.l !== DEFAULT_LIQUID.l || c.c !== DEFAULT_LIQUID.c || c.h !== DEFAULT_LIQUID.h)
+      bits.push(`l:${c.l}, c:${c.c}, h:${c.h}`);
+    return `  ${JSON.stringify(n)}: { ${bits.join(', ')} },`;
+  }).join('\n');
+  document.getElementById('out').value = `const CUPS = {\n${body}\n};`;
+  document.getElementById('tally').textContent =
+    `${names.length} of ${PLACES.length} configured`;
+}
+
+/* ── writing cups.js ──────────────────────────────────────────────────
+   The File System Access API lets the page write the file directly once
+   you point at it. cups.js is entirely generated, so rewriting the whole
+   thing is safe — places.js, which you hand-edit, is never touched.
+   ─────────────────────────────────────────────────────────────────── */
+const FILE_HEAD =
+`/* Generated by vessels.html — do not hand-edit; the configurator
+   rewrites this whole file. Place data lives in places.js.
+
+   Anything absent falls back to DEFAULT_CUP in cup.js, which is the
+   plain paper cup the site has always shown. */
+`;
+const fileText = () => FILE_HEAD + document.getElementById('out').value +
+  '\n\nPLACES.forEach(p => { if (CUPS[p.place]) p.cup = CUPS[p.place]; });\n';
+
+let handle = null;
+const saveBtn = document.getElementById('save');
+
+saveBtn.addEventListener('click', async () => {
+  const text = fileText();
+  try{
+    if(window.showSaveFilePicker){
+      if(!handle){
+        handle = await showSaveFilePicker({
+          suggestedName: 'cups.js',
+          types: [{ description: 'JavaScript', accept: { 'text/javascript': ['.js'] } }]
+        });
+      }
+      const w = await handle.createWritable();
+      await w.write(text);
+      await w.close();
+    } else {
+      const a = document.createElement('a');           // fallback: download it
+      a.href = URL.createObjectURL(new Blob([text], { type: 'text/javascript' }));
+      a.download = 'cups.js';
+      a.click();
+      URL.revokeObjectURL(a.href);
+    }
+    markDirty(false);
+    saveBtn.textContent = 'Saved';
+    setTimeout(() => saveBtn.textContent = 'Save to cups.js', 1400);
+  }catch(err){
+    if(err.name === 'AbortError') return;              // picker dismissed
+    saveBtn.textContent = 'Save failed';
+    setTimeout(() => saveBtn.textContent = 'Save to cups.js', 2000);
+  }
+});
+
+document.getElementById('copy').addEventListener('click', async e => {
+  await navigator.clipboard.writeText(fileText());
+  e.target.textContent = 'Copied';
+  setTimeout(() => e.target.textContent = 'Copy', 1200);
+});
+
+document.getElementById('reset').addEventListener('click', () => {
+  delete config[selected];
+  localStorage.setItem(STORE, JSON.stringify(config));
+  markDirty(true);
+  paintList(); paintControls(); render(); paintOut();
+});
+
+function toggle(id, fn){
+  const b = document.getElementById(id);
+  b.addEventListener('click', () => {
+    const on = b.getAttribute('aria-pressed') !== 'true';
+    b.setAttribute('aria-pressed', on);
+    fn(on);
+  });
+}
+toggle('toggle-profile', on => { showProfile = on; if(profileLine) profileLine.visible = on; });
+toggle('toggle-spin',    on => controls.autoRotate = on);
+
+/* ── go ───────────────────────────────────────────────────────────── */
+function fit(){
+  const w = el.clientWidth, h = el.clientHeight;
+  if(!w || !h) return;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  if(cup) frame(VESSELS[cfgFor(selected).vessel]);
+}
+new ResizeObserver(fit).observe(el);
+
+document.getElementById('stage-label').textContent = selected;
+paintList(); paintControls(); render(); paintOut(); fit();
+
+(function tick(){
+  requestAnimationFrame(tick);
+  controls.update();
+  renderer.render(scene, camera);
+})();
+</script>
+</body>
+</html>
