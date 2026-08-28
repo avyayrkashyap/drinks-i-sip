@@ -7,7 +7,7 @@
 
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20,300,0,0&display=swap" rel="stylesheet">
 
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet">
 <script src="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.js"></script>
@@ -30,6 +30,10 @@
     --mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
   }
   *{box-sizing:border-box}
+  /* keep focus obvious, but in the site's own palette */
+  :where(button,a,[tabindex]):focus-visible{
+    outline:2px solid var(--ink);outline-offset:2px;border-radius:2px;
+  }
   body{
     margin:0;height:100vh;overflow:hidden;
     background:var(--paper);color:var(--ink);
@@ -48,7 +52,108 @@
     font-family:var(--mono);font-size:11px;font-weight:500;
     letter-spacing:.16em;text-transform:uppercase;
   }
+  .masthead .lead{display:flex;align-items:center;gap:12px}
   .masthead .mark{color:var(--ink)}
+
+  .mi{
+    font-family:"Material Symbols Outlined";
+    font-weight:normal;font-style:normal;line-height:1;
+    letter-spacing:normal;text-transform:none;white-space:nowrap;
+    font-variation-settings:"opsz" 20,"wght" 300;
+    font-size:15px;
+  }
+
+  .pill{
+    display:inline-flex;align-items:center;gap:5px;
+    font:inherit;color:var(--mute);
+    /* buttons don't inherit these from the masthead — the UA resets them */
+    text-transform:uppercase;letter-spacing:inherit;
+    background:none;border:1px solid var(--rule);border-radius:2px;
+    padding:3px 9px 3px 7px;cursor:pointer;
+  }
+  .pill:hover{color:var(--ink);border-color:#cfcfcf}
+
+  .icon-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    width:28px;height:28px;color:var(--mute);
+    background:none;border:0;border-radius:2px;cursor:pointer;
+  }
+  .icon-btn:hover{color:var(--ink);background:#f4f4f4}
+  .icon-btn .mi{font-size:20px}
+
+  /* ------------------------------------------------------------ about */
+  .sheet{
+    width:min(460px,calc(100vw - 32px));
+    padding:0;border:1px solid var(--rule);border-radius:var(--card);
+    background:var(--paper);color:var(--ink);
+    box-shadow:0 18px 60px rgba(0,0,0,.13);
+  }
+  .sheet::backdrop{background:rgba(20,20,20,.3)}
+  .sheet-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:13px 12px 11px 18px;border-bottom:1px solid var(--rule);
+  }
+  .sheet-head h2{
+    margin:0;font-family:var(--mono);font-size:10.5px;font-weight:500;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--mute);
+  }
+  .sheet-body:focus{outline:none}
+  .sheet-body{
+    padding:18px;max-height:min(64vh,520px);overflow-y:auto;
+    overscroll-behavior:contain;          /* never chain to the page */
+  }
+  .sheet-body p{margin:0 0 13px;font-size:14.5px;line-height:1.55}
+  .sheet-body p:last-of-type{margin-bottom:19px}
+
+  .sheet-h{
+    margin:0 0 8px;padding-top:16px;border-top:1px solid var(--rule);
+    font-family:var(--mono);font-size:9.5px;font-weight:500;
+    letter-spacing:.16em;text-transform:uppercase;color:var(--mute);
+  }
+  .sheet-body .lede{font-size:12.5px;color:var(--graphite);margin-bottom:13px}
+
+  .rubric{list-style:none;margin:0 0 4px;padding:0}
+  .rubric li{display:flex;gap:12px;margin-bottom:12px}
+  .rubric .mi{flex:none;font-size:17px;color:var(--mute);margin-top:1px}
+  .rubric h4{
+    margin:0 0 2px;font-family:var(--mono);font-size:9.5px;font-weight:500;
+    letter-spacing:.12em;text-transform:uppercase;color:var(--ink);
+  }
+  .rubric p{margin:0;font-size:12.5px;line-height:1.45;color:var(--graphite)}
+
+  .sheet-links{display:flex;flex-direction:column;gap:6px;margin-top:16px}
+  .soon-tag{
+    font-family:var(--mono);font-size:9px;letter-spacing:.14em;
+    text-transform:uppercase;color:var(--mute);
+    border:1px solid var(--rule);border-radius:999px;padding:2px 7px;
+  }
+
+  .credits{margin:0;padding:0 0 4px}
+  .credits>div{display:flex;gap:12px;margin-bottom:8px;align-items:baseline}
+  .credits dt{
+    display:flex;align-items:center;gap:6px;flex:none;width:104px;
+    font-family:var(--mono);font-size:9.5px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--mute);
+  }
+  .credits dt .mi{font-size:15px}
+  .credits dd{margin:0;font-size:12.5px;line-height:1.4;color:var(--ink)}
+
+  .sheet-link{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:11px 13px;
+    border:1px solid var(--rule);border-radius:2px;
+    font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
+    text-transform:uppercase;color:var(--graphite);text-decoration:none;
+  }
+  .sheet-link{width:100%;background:none;font:inherit;
+              font-family:var(--mono);font-size:10.5px;letter-spacing:.12em;
+              text-transform:uppercase;text-align:left;cursor:pointer}
+  .sheet-link:hover:not(:disabled){color:var(--ink);border-color:#cfcfcf}
+  .sheet-link:disabled{cursor:default;color:var(--mute)}
+  .sheet-link .mi{font-size:16px}
+
+  /* the page never scrolls, but the list behind the modal must not either */
+  body.modal-open .list{overflow:hidden}
   .masthead .tally{color:var(--mute)}
 
   /* ------------------------------------------------------------- board */
@@ -145,7 +250,7 @@
   .maplibregl-ctrl-attrib{font-size:9px;font-family:var(--mono)}
 
   /* ------------------------------------------------------------- list */
-  .list{flex:1;min-height:0;overflow-y:auto;padding-bottom:10px}
+  .list{flex:1;min-height:0;overflow-y:auto;padding-bottom:10px;scrollbar-gutter:stable}
   .row{
     width:100%;text-align:left;background:none;border:0;
     font:inherit;color:inherit;cursor:pointer;
@@ -178,6 +283,11 @@
     .frame{height:100dvh}
 
     .masthead{font-size:10px;letter-spacing:.12em;white-space:nowrap;gap:10px}
+    .masthead .lead{gap:8px}
+    .pill-text{display:none}                 /* icon alone on a phone */
+    .pill{padding:4px 7px}
+    .sheet-body:focus{outline:none}
+  .sheet-body{max-height:70vh}
     .readout{font-size:9.5px;letter-spacing:.1em;gap:8px}
     .readout span:not(:last-child)::after{margin-left:8px}
     .board{padding:12px 12px 10px}
@@ -229,7 +339,12 @@
 <div class="frame">
 
   <header class="masthead">
-    <span class="mark">Drinks I Sip</span>
+    <span class="lead">
+      <span class="mark">Drinks I Sip</span>
+      <button class="pill" id="about-open" aria-haspopup="dialog">
+        <span class="mi" aria-hidden="true">info</span><span class="pill-text">About</span>
+      </button>
+    </span>
     <span class="tally" id="tally"></span>
   </header>
 
@@ -271,6 +386,78 @@
 
   <button class="fab" id="open-map">Map</button>
 </div>
+
+<dialog class="sheet" id="about" aria-labelledby="about-title">
+  <div class="sheet-head">
+    <h2 id="about-title">About</h2>
+    <button class="icon-btn" id="about-close" aria-label="Close">
+      <span class="mi" aria-hidden="true">close</span>
+    </button>
+  </div>
+
+  <div class="sheet-body" tabindex="-1" autofocus>
+    <p>A hot chocolate in the winter, a coffee in the summer, and a cocktail
+       anytime is my favourite way to experience a new city. Moving to New York
+       exposed me to the largest catalogue of these drinks, and as such, I
+       wanted to find the best. This website is a running note of drinks I've
+       sipped, and at times, chugged.</p>
+
+    <p>Feel free to drop me recommendations.</p>
+
+    <h3 class="sheet-h">Methodology</h3>
+    <p class="lede">I graded each hot chocolate along three criteria, each
+       scored out of ten.</p>
+
+    <ul class="rubric">
+      <li>
+        <span class="mi" aria-hidden="true">water_drop</span>
+        <div>
+          <h4>Cocoa presence</h4>
+          <p>How full is the taste of the cocoa? Is the bitterness controlled?</p>
+        </div>
+      </li>
+      <li>
+        <span class="mi" aria-hidden="true">waves</span>
+        <div>
+          <h4>Body</h4>
+          <p>How close to just-right does the drink feel viscosity-wise?</p>
+        </div>
+      </li>
+      <li>
+        <span class="mi" aria-hidden="true">hourglass_empty</span>
+        <div>
+          <h4>Sustainability</h4>
+          <p>How quickly does enjoyment of the drink decay?</p>
+        </div>
+      </li>
+    </ul>
+
+    <h3 class="sheet-h">Sources</h3>
+    <dl class="credits">
+      <div><dt><span class="mi" aria-hidden="true">map</span>Basemap</dt>
+           <dd>OpenFreeMap</dd></div>
+      <div><dt><span class="mi" aria-hidden="true">apartment</span>Buildings</dt>
+           <dd>NYC Open Data</dd></div>
+      <div><dt><span class="mi" aria-hidden="true">local_cafe</span>Cups</dt>
+           <dd>three.js</dd></div>
+    </dl>
+
+    <div class="sheet-links">
+      <a class="sheet-link" href="mailto:avyayrk@gmail.com">
+        <span>Email me</span>
+        <span class="mi" aria-hidden="true">mail</span>
+      </a>
+      <button class="sheet-link" disabled>
+        <span>How I built this, on Substack</span>
+        <span class="soon-tag">Soon</span>
+      </button>
+      <a class="sheet-link" href="https://avyayrk.com" target="_blank" rel="noopener">
+        <span>Say hi to Avyay</span>
+        <span class="mi" aria-hidden="true">open_in_new</span>
+      </a>
+    </div>
+  </div>
+</dialog>
 
 <script>
 /* the list lives in places.js, shared with the cup configurator */
@@ -547,7 +734,44 @@ function closeMap(){
 
 fab.addEventListener('click', openMap);
 document.getElementById('close-map').addEventListener('click', closeMap);
-addEventListener('keydown', e => { if(e.key === 'Escape') closeMap(); });
+/* ── about ────────────────────────────────────────────────────────────
+   A native <dialog> so focus trapping, the top layer and Escape come
+   for free. The page itself never scrolls, but the places list does —
+   so lock that too, and stop the modal's own scroll from chaining out.
+   ─────────────────────────────────────────────────────────────────── */
+const about = document.getElementById('about');
+
+document.getElementById('about-open').addEventListener('click', () => {
+  about.showModal();
+  /* after showModal — scrollTop does not stick on a display:none element */
+  about.querySelector('.sheet-body').scrollTop = 0;
+  document.body.classList.add('modal-open');
+});
+
+function closeAbout(){
+  about.close();
+}
+document.getElementById('about-close').addEventListener('click', closeAbout);
+
+/* clicking the backdrop lands on the dialog itself, not its contents */
+about.addEventListener('click', e => {
+  if(e.target === about) closeAbout();
+});
+
+/* fires however it closed — button, backdrop or Escape */
+about.addEventListener('close', () => {
+  document.body.classList.remove('modal-open');
+  document.getElementById('about-open').focus();
+});
+
+/* <dialog> closes itself on Escape, but close it explicitly rather than
+   trusting that — close() on a shut dialog is a no-op, so doing both is
+   harmless, and this way the key never falls through to the map sheet. */
+addEventListener('keydown', e => {
+  if(e.key !== 'Escape') return;
+  if(about.open){ closeAbout(); return; }
+  closeMap();
+});
 narrow.addEventListener('change', () => {
   if(!narrow.matches) closeMap();
   deckMap.setAttribute('aria-hidden','false');
