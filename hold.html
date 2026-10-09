@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hold a cup</title>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
+<script src="https://unpkg.com/ml5@1.2.1/dist/ml5.min.js"></script>
+<script src="places.js"></script>
+<script src="cups.js"></script>
+<style>
+  :root{
+    --paper:#fff; --rule:#e7e7e7; --mute:#9b9b9b; --graphite:#6b6b6b; --ink:#141414;
+    --pad:14px; --card:4px;
+    --ui:"Archivo",system-ui,sans-serif; --mono:"IBM Plex Mono",monospace;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;height:100vh;overflow:hidden;background:var(--paper);color:var(--ink);
+       font-family:var(--ui);font-size:15px;line-height:1.4;-webkit-font-smoothing:antialiased}
+
+  .frame{height:100vh;padding:var(--pad);display:grid;grid-template-rows:auto 1fr;gap:var(--pad)}
+  .masthead{display:flex;justify-content:space-between;align-items:baseline;
+            font-family:var(--mono);font-size:11px;font-weight:500;
+            letter-spacing:.16em;text-transform:uppercase}
+  .masthead .tally{color:var(--mute)}
+
+  :where(button):focus-visible{outline:2px solid var(--ink);outline-offset:2px;border-radius:2px}
+
+  .decks{display:grid;grid-template-columns:250px 1fr;gap:var(--pad);min-height:0}
+  .deck{display:flex;flex-direction:column;min-width:0;min-height:0;overflow:hidden;
+        border:1px solid var(--rule);border-radius:var(--card)}
+  .deck-head{flex:none;padding:11px 13px 9px;font-family:var(--mono);font-size:10.5px;font-weight:500;
+             letter-spacing:.16em;text-transform:uppercase;color:var(--mute)}
+  .list{flex:1;min-height:0;overflow-y:auto;margin:0;padding:0 0 8px;list-style:none}
+  .row{width:100%;text-align:left;background:none;border:0;font:inherit;color:inherit;
+       cursor:pointer;padding:7px 13px 7px 11px;border-left:2px solid transparent;display:block;
+       font-size:13.5px;font-weight:500}
+  .row:hover{background:#fafafa}
+  .row[aria-selected="true"]{border-left-color:var(--ink);background:#f7f7f7;font-weight:600}
+
+  #stage{flex:1;min-height:0}
+  #stage canvas{display:block}
+
+  .p5Canvas{position:fixed;right:var(--pad);bottom:var(--pad);
+         border:1px solid var(--rule);border-radius:var(--card)}
+</style>
+</head>
+<body>
+
+<div class="frame">
+  <header class="masthead">
+    <span>Hold a cup</span>
+    <span class="tally"><span id="p5_loading">Loading hands · </span><span id="tally"></span></span>
+  </header>
+
+  <div class="decks">
+    <section class="deck">
+      <div class="deck-head">Places</div>
+      <div class="list" id="list" role="listbox" aria-label="Places"></div>
+    </section>
+    <section class="deck">
+      <div class="deck-head" id="stage-head"></div>
+      <div id="stage"></div>
+    </section>
+  </div>
+</div>
+
+<script type="importmap">
+{"imports":{
+  "three":"https://cdn.jsdelivr.net/npm/three@0.185.1/build/three.module.js",
+  "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.185.1/examples/jsm/"
+}}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { buildCup, VESSELS, DEFAULT_CUP, DEFAULT_LIQUID, setLiquid } from './cup.js';
+
+/* ── places ───────────────────────────────────────────────────────── */
+const list = document.getElementById('list');
+list.innerHTML = PLACES.map((p, i) =>
+  `<button class="row" role="option" data-i="${i}">${p.place}</button>`).join('');
+document.getElementById('tally').textContent = `${PLACES.length} places`;
+list.addEventListener('click', e => {
+  const row = e.target.closest('.row');
+  if(row) select(+row.dataset.i);
+});
+
+/* ── the cup ──────────────────────────────────────────────────────── */
+const el = document.getElementById('stage');
+const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+el.appendChild(renderer.domElement);
+
+const scene  = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(38, 1, 0.1, 100);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xdedede, 2.5));
+const key = new THREE.DirectionalLight(0xffffff, 1.4);
+key.position.set(2.5, 4, 2.5);
+scene.add(key);
+
+const texLoader = new THREE.TextureLoader();
+const texCache  = new Map();
+function sleeveTexture(slug){
+  if(!slug) return null;
+  if(!texCache.has(slug)){
+    const t = texLoader.load(`assets/hot-chocolates/${slug}.png`);
+    t.colorSpace = THREE.SRGBColorSpace;
+    t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+    texCache.set(slug, t);
+  }
+  return texCache.get(slug);
+}
+
+const DIR = new THREE.Vector3(0.62, 0.55, 0.86).normalize();
+let cupGroup = null, vesselH = 1;
+
+function select(i){
+  const place = PLACES[i];
+  list.querySelectorAll('.row').forEach((r, j) => r.setAttribute('aria-selected', j === i));
+  document.getElementById('stage-head').textContent = place.place;
+
+  if(cupGroup){
+    scene.remove(cupGroup);
+    cupGroup.traverse(n => { if(n.geometry) n.geometry.dispose(); });
+  }
+  const cfg = { ...DEFAULT_CUP, ...DEFAULT_LIQUID, ...(place.cup || {}) };
+  setLiquid(cfg);
+  cupGroup = buildCup({ ...cfg, labelTexture: sleeveTexture(place.sleeve), facing: Math.atan2(DIR.x, DIR.z) });
+  scene.add(cupGroup);
+  vesselH = (VESSELS[cfg.vessel] || VESSELS['Paper cup']).h;
+  fit();
+}
+
+function fit(){
+  const w = el.clientWidth, h = el.clientHeight;
+  if(!w || !h) return;
+  renderer.setSize(w, h);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+  const R = Math.max(vesselH * 0.62, 0.8);
+  const vFov = camera.fov * Math.PI / 180;
+  const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
+  const target = new THREE.Vector3(0, vesselH * 0.5, 0);
+  camera.position.copy(target).addScaledVector(DIR, R / Math.tan(Math.min(vFov, hFov) / 2) * 1.2);
+  camera.lookAt(target);
+}
+new ResizeObserver(fit).observe(el);
+
+/* ── holding it ─────────────────────────────────────────────────────
+   A grip is thumb and index tips close together, measured against the
+   palm (wrist → middle knuckle) so it means the same near or far from
+   the camera. Two thresholds so a wobbly grip doesn't drop the cup.
+   The fingers have to close on the cup; then the cup's middle follows the
+   point between the two fingertips, and the cup turns as the hand turns
+   from the moment of the grab. Let go and it settles back home.
+
+   `hands`, `pinched`, W, H, GRAB, LET_GO and gripGap come from the p5
+   script below — top-level lets in a classic script are visible (and
+   assignable) from modules by name.
+   ─────────────────────────────────────────────────────────────────── */
+const REACH  = 0.15;   // how far (fraction of the stage) a grip can start from the cup
+
+const ray = new THREE.Raycaster(), plane = new THREE.Plane();
+const ndc = new THREE.Vector2(), hit = new THREE.Vector3(), aim = new THREE.Vector3();
+let held = false;
+const grabHand = new THREE.Quaternion(), grabCup = new THREE.Quaternion();   // both as they were at the grab
+
+/* The hand's orientation in camera space, from handPose's 3D keypoints
+   (metres around the hand's centre, already mirrored like the preview).
+   A frame on the palm: up runs wrist → middle knuckle, the normal comes
+   off the palm, across runs index → pinky. MediaPipe's y points down and
+   its z away from the camera, so both flip. */
+const v3 = k => new THREE.Vector3(k.x3D, -k.y3D, -k.z3D);
+const basis = new THREE.Matrix4();
+function handTurn(hand){
+  const up = v3(hand.middle_finger_mcp).sub(v3(hand.wrist)).normalize();
+  const n  = v3(hand.pinky_finger_mcp).sub(v3(hand.index_finger_mcp)).cross(up).normalize();
+  basis.makeBasis(new THREE.Vector3().crossVectors(up, n), up, n);
+  return new THREE.Quaternion().setFromRotationMatrix(basis);
+}
+
+/* How far the hand has turned since the grab, as a world rotation —
+   reversed on every axis, because that's what reads right on screen. */
+function turnSinceGrab(hand){
+  const d = handTurn(hand).multiply(grabHand.clone().invert()).invert();
+  return d.premultiply(camera.quaternion).multiply(camera.quaternion.clone().invert());
+}
+
+function grip(){
+  const hand = hands[0];
+  if(!hand) return null;
+  const t = hand.thumb_tip, i = hand.index_finger_tip;
+  return { hand, gap: gripGap(hand),
+           x: (t.x + i.x) / W - 1, y: 1 - (t.y + i.y) / H };   // midpoint, as NDC
+}
+
+function hold(){
+  const g = grip();
+  const middle = new THREE.Vector3(0, vesselH * 0.5, 0);
+
+  const closed = !!g && g.gap < (pinched ? LET_GO : GRAB);
+  if(closed && !pinched){                       // fingers just closed — on the cup?
+    const c = middle.clone().applyQuaternion(cupGroup.quaternion).add(cupGroup.position).project(camera);
+    held = Math.hypot(c.x - g.x, c.y - g.y) / 2 < REACH;
+    if(held){ grabHand.copy(handTurn(g.hand)); grabCup.copy(cupGroup.quaternion); }
+  }
+  if(!closed) held = false;
+  pinched = closed;
+
+  /* where the cup wants to be: home, or turned with the hand and hung
+     from the grip point by its middle (so it pivots there, not its base) */
+  const turn = held ? turnSinceGrab(g.hand).multiply(grabCup) : new THREE.Quaternion();
+  aim.set(0, 0, 0);
+  if(held){
+    plane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(hit), middle);
+    ray.setFromCamera(ndc.set(g.x, g.y), camera);
+    if(ray.ray.intersectPlane(plane, hit)) aim.copy(hit).sub(middle.clone().applyQuaternion(turn));
+  }
+  cupGroup.position.lerp(aim, 0.3);   // smooths the model's jitter too
+  cupGroup.quaternion.slerp(turn, 0.3);
+}
+
+select(0);
+renderer.setAnimationLoop(() => { hold(); renderer.render(scene, camera); });
+</script>
+
+<script>
+  const W = 320, H = 240;
+  const TIPS = ["thumb_tip", "index_finger_tip"];   // the two that hold the cup
+  const GRAB   = 1.20;   // thumb–index gap / palm length to pick the cup up
+  const LET_GO = 1.45;   // …and to put it down
+  let handPose, video, hands = [], pinched = false;   // pinched: hands[0]'s grip, kept by the module
+
+  const gripGap = h => dist(h.thumb_tip.x, h.thumb_tip.y, h.index_finger_tip.x, h.index_finger_tip.y)
+                     / dist(h.wrist.x, h.wrist.y, h.middle_finger_mcp.x, h.middle_finger_mcp.y);
+
+  function preload() {
+    handPose = ml5.handPose({ flipped: true });
+  }
+
+  function setup() {
+    createCanvas(W, H);
+    video = createCapture(VIDEO, { flipped: true });
+    video.size(W, H);
+    video.hide();
+    handPose.detectStart(video, r => hands = r);
+  }
+
+  function draw() {
+    image(video, 0, 0, W, H);
+    drawingContext.shadowBlur = 16;
+    strokeWeight(1.5);
+    for (const hand of hands) {
+      const close = hand === hands[0] ? pinched : gripGap(hand) < GRAB;   // blue: close enough to hold
+      drawingContext.shadowColor = close ? "rgba(0, 240, 255, 0.9)" : "rgba(255, 40, 70, 0.9)";
+      fill(...(close ? [0, 230, 255] : [255, 40, 70]), 70);
+      stroke(...(close ? [200, 255, 255] : [255, 200, 205]), 200);
+      for (const name of TIPS) ellipse(hand[name].x, hand[name].y, 16);
+    }
+    drawingContext.shadowBlur = 0;
+  }
+</script>
+</body>
+</html>
