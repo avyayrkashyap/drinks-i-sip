@@ -285,7 +285,7 @@
   /* thumb and index while holding, as far apart as your fingers (--s: 0
      touching, 1 wide open). Grey: no hand. Red: too far. Blue: hold. */
   .hold{position:relative;display:inline-flex}
-  .grip{position:absolute;top:calc(100% + 9px);left:50%;width:56px;height:10px;margin-left:-28px;
+  .grip{position:absolute;z-index:2;top:calc(100% + 9px);left:50%;width:56px;height:10px;margin-left:-28px;
         --c:var(--mute);--glow:transparent;--s:1;--in:calc((1 - var(--s)) * 18px)}
   .grip[hidden]{display:none}
   .grip::before{content:"";position:absolute;left:calc(5px + var(--in));right:calc(5px + var(--in));
@@ -316,16 +316,30 @@
     .readout span:not(:last-child)::after{margin-left:8px}
     .board{padding:12px 12px 10px}
 
-    /* keep the last row clear of the map button */
-    .list{padding-bottom:64px}
+    /* room under the cards for the map button */
+    .frame{padding-bottom:calc(var(--pad) + 49px + env(safe-area-inset-bottom))}
 
     .flaps{gap:1px}
     .flap .ch{font-size:clamp(11px,3.4vw,30px)}
 
-    /* cup sits directly under the board; the list takes what is left */
-    .decks{grid-template-columns:1fr;grid-template-rows:auto 1fr}
-    .deck--cup{order:1;height:min(30vh,240px)}
-    .deck--list{order:2;min-height:0}
+    /* cup sits directly under the board and takes what is left; the
+       places are a row of cards under it, swiped sideways */
+    .decks{grid-template-columns:1fr;grid-template-rows:1fr auto}
+    .deck--cup{order:1}
+    .deck--list{order:2;border:0;border-radius:0;background:none}
+    .deck--list .deck-head{display:none}
+    .list{display:flex;gap:8px;padding:0;overflow-x:auto;overflow-y:hidden;
+          scroll-snap-type:x mandatory;scrollbar-width:none;overscroll-behavior-x:contain}
+    .list::-webkit-scrollbar{display:none}
+    .row{flex:none;width:clamp(150px,42vw,210px);scroll-snap-align:start;
+         flex-direction:column;align-items:stretch;gap:14px;
+         padding:11px 12px 10px;border:1px solid var(--rule);border-radius:var(--card)}
+    .row:hover{background:none}
+    .row[aria-selected="true"]{border-color:var(--ink);background:none}
+    .row-name{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;
+              min-height:2.8em;line-height:1.4}
+    .row-where{display:none}
+    .row-meta{flex-direction:row;justify-content:space-between;align-items:baseline}
 
     /* the map is a place you go to, not a panel you look past */
     .deck--map{
@@ -845,6 +859,8 @@ function select(i, fly){
   paintPins();
   paintBuildings();
   if(window.setSleeve) window.setSleeve(p);
+  // keep the chosen place in view: a card in the row on a phone, a row in the list otherwise
+  list.querySelector(`[data-i="${i}"]`).scrollIntoView({ block:'nearest', inline:'nearest', behavior: reduced.matches ? 'auto' : 'smooth' });
   if(fly && mapReady) map.flyTo({ center:[p.lng,p.lat], zoom:15.4, pitch:58, duration:900 });
 }
 </script>
@@ -898,11 +914,11 @@ disc.position.y = 0.001;
 scene.add(disc);
 
 /* ── the pad ──────────────────────────────────────────────────────────
-   While you hold cups, the cup rests on a pad hovering over a fainter
-   echo of itself: rings, ticks, ripples and a sweep, drawn on a canvas
-   each frame. Blue and turning while the cup is on it; pick the cup up
-   and it greys and winds down to a stop, lighting up again when you
-   bring it back over it. Fades in with the framing.
+   While you hold cups, the cup rests on a pad: rings, ticks, ripples
+   and a sweep, drawn on a canvas each frame. Blue and turning while the
+   cup is on it; pick the cup up and it greys and winds down to a stop,
+   lighting up again when you bring it back over it. Fades in with the
+   framing.
    ─────────────────────────────────────────────────────────────────── */
 const padCanvas = Object.assign(document.createElement('canvas'), { width:512, height:512 });
 const padCtx = padCanvas.getContext('2d');
@@ -914,14 +930,8 @@ const pad = new THREE.Mesh(
 );
 pad.rotation.x = -Math.PI / 2;
 pad.position.y = -0.004;                 // just under the cup's base
-const echo = new THREE.Mesh(pad.geometry, pad.material.clone());
-echo.rotation.x = -Math.PI / 2;
-echo.position.y = -0.18;
-echo.scale.setScalar(0.72);
-const pads = new THREE.Group();
-pads.add(pad, echo);
-pads.visible = false;
-scene.add(pads);
+pad.visible = false;
+scene.add(pad);
 
 let padLive = 1, padT = 0, padDrawn = -1;   // live: 1 blue and moving, 0 grey and still
 function drawPad(dt, on){
@@ -1216,9 +1226,8 @@ function frame(){
   const fh = h / (1 + low);
   camera.aspect = w / fh;
   camera.setViewOffset(w, fh, 0, fh - h, w, h);
-  pads.visible = low > 0;
+  pad.visible = low > 0;
   pad.material.opacity = low;
-  echo.material.opacity = low * 0.35;
   disc.material.opacity = 0.04 * (1 - low);       // the pad stands in for the shadow
   const R = Math.max((VESSELS[(current?.cup?.vessel) || 'Paper cup'] || VESSELS['Paper cup']).h * 0.62, 0.8);
   const vFov = camera.fov * Math.PI / 180;
@@ -1250,7 +1259,7 @@ let last = performance.now();
     gripEl.style.setProperty('--s', spread.toFixed(3));
     drawArc(grip.state, spread, now);
   }
-  if(pads.visible) drawPad(dt, lit);
+  if(pad.visible) drawPad(dt, lit);
   renderer.render(scene, camera);
 })();
 </script>
