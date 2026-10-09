@@ -57,7 +57,7 @@ function handTurn(hand){
    (fingers too far apart to hold) or 'close'; spread runs from 0 with
    the fingers close enough to grab to 1 wide open. stop() to end. */
 export async function holdCup({ camera, cup, preview }){
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+  const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });   // the selfie camera on a phone
   const video = Object.assign(document.createElement('video'), { srcObject: stream, muted: true, playsInline: true });
   const dots = document.createElement('canvas');
   const ctx = dots.getContext('2d');

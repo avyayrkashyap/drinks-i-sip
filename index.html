@@ -1004,11 +1004,16 @@ holdBtn.addEventListener('click', async () => {
     controls.autoRotate = false;
     gripEl.hidden = false;
     holdBtn.setAttribute('aria-pressed', 'true');
+    holdBtn.textContent = 'Hold cup';
   }catch(e){
     console.warn('hold cup:', e);
+    // say why, briefly — on a phone there's no console to look in
+    holdBtn.textContent = e.name === 'NotAllowedError' ? 'Camera blocked'
+                        : e.name === 'NotFoundError'   ? 'No camera'
+                        : "Couldn't start";
+    setTimeout(() => { if(!holding && !holdBtn.disabled) holdBtn.textContent = 'Hold cup'; }, 2500);
   }
   holdBtn.disabled = false;
-  holdBtn.textContent = 'Hold cup';
 });
 
 /* the board calls this whenever the selection changes */
