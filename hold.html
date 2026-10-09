@@ -5,8 +5,6 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold a cup</title>
 <link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://cdn.jsdelivr.net/npm/p5@1.11.3/lib/p5.min.js"></script>
-<script src="https://unpkg.com/ml5@1.2.1/dist/ml5.min.js"></script>
 <script src="places.js"></script>
 <script src="cups.js"></script>
 <style>
@@ -42,8 +40,11 @@
   #stage{flex:1;min-height:0}
   #stage canvas{display:block}
 
-  .p5Canvas{position:fixed;right:var(--pad);bottom:var(--pad);
-         border:1px solid var(--rule);border-radius:var(--card)}
+  .hands{position:fixed;right:var(--pad);bottom:var(--pad);width:320px;
+         border:1px solid var(--rule);border-radius:var(--card);overflow:hidden}
+  .hands:empty{display:none}
+  .hands video{display:block;width:100%;height:auto;transform:scaleX(-1)}   /* a mirror, like the model sees it */
+  .hands canvas{position:absolute;inset:0;width:100%;height:100%}
 </style>
 </head>
 <body>
@@ -51,7 +52,7 @@
 <div class="frame">
   <header class="masthead">
     <span>Hold a cup</span>
-    <span class="tally"><span id="p5_loading">Loading hands · </span><span id="tally"></span></span>
+    <span class="tally"><span id="hands-state">Loading hands · </span><span id="tally"></span></span>
   </header>
 
   <div class="decks">
@@ -65,6 +66,7 @@
     </section>
   </div>
 </div>
+<div class="hands" id="hands"></div>
 
 <script type="importmap">
 {"imports":{
@@ -76,6 +78,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { buildCup, VESSELS, DEFAULT_CUP, DEFAULT_LIQUID, setLiquid } from './cup.js';
+import { holdCup } from './hold.js';
 
 /* ── places ───────────────────────────────────────────────────────── */
 const list = document.getElementById('list');
@@ -148,119 +151,15 @@ function fit(){
 }
 new ResizeObserver(fit).observe(el);
 
-/* ── holding it ─────────────────────────────────────────────────────
-   A grip is thumb and index tips close together, measured against the
-   palm (wrist → middle knuckle) so it means the same near or far from
-   the camera. Two thresholds so a wobbly grip doesn't drop the cup.
-   The fingers have to close on the cup; then the cup's middle follows the
-   point between the two fingertips, and the cup turns as the hand turns
-   from the moment of the grab. Let go and it settles back home.
-
-   `hands`, `pinched`, W, H, GRAB, LET_GO and gripGap come from the p5
-   script below — top-level lets in a classic script are visible (and
-   assignable) from modules by name.
-   ─────────────────────────────────────────────────────────────────── */
-const REACH  = 0.15;   // how far (fraction of the stage) a grip can start from the cup
-
-const ray = new THREE.Raycaster(), plane = new THREE.Plane();
-const ndc = new THREE.Vector2(), hit = new THREE.Vector3(), aim = new THREE.Vector3();
-let held = false;
-const grabHand = new THREE.Quaternion(), grabCup = new THREE.Quaternion();   // both as they were at the grab
-
-/* The hand's orientation in camera space, from handPose's 3D keypoints
-   (metres around the hand's centre, already mirrored like the preview).
-   A frame on the palm: up runs wrist → middle knuckle, the normal comes
-   off the palm, across runs index → pinky. MediaPipe's y points down and
-   its z away from the camera, so both flip. */
-const v3 = k => new THREE.Vector3(k.x3D, -k.y3D, -k.z3D);
-const basis = new THREE.Matrix4();
-function handTurn(hand){
-  const up = v3(hand.middle_finger_mcp).sub(v3(hand.wrist)).normalize();
-  const n  = v3(hand.pinky_finger_mcp).sub(v3(hand.index_finger_mcp)).cross(up).normalize();
-  basis.makeBasis(new THREE.Vector3().crossVectors(up, n), up, n);
-  return new THREE.Quaternion().setFromRotationMatrix(basis);
-}
-
-/* How far the hand has turned since the grab, as a world rotation —
-   reversed on every axis, because that's what reads right on screen. */
-function turnSinceGrab(hand){
-  const d = handTurn(hand).multiply(grabHand.clone().invert()).invert();
-  return d.premultiply(camera.quaternion).multiply(camera.quaternion.clone().invert());
-}
-
-function grip(){
-  const hand = hands[0];
-  if(!hand) return null;
-  const t = hand.thumb_tip, i = hand.index_finger_tip;
-  return { hand, gap: gripGap(hand),
-           x: (t.x + i.x) / W - 1, y: 1 - (t.y + i.y) / H };   // midpoint, as NDC
-}
-
-function hold(){
-  const g = grip();
-  const middle = new THREE.Vector3(0, vesselH * 0.5, 0);
-
-  const closed = !!g && g.gap < (pinched ? LET_GO : GRAB);
-  if(closed && !pinched){                       // fingers just closed — on the cup?
-    const c = middle.clone().applyQuaternion(cupGroup.quaternion).add(cupGroup.position).project(camera);
-    held = Math.hypot(c.x - g.x, c.y - g.y) / 2 < REACH;
-    if(held){ grabHand.copy(handTurn(g.hand)); grabCup.copy(cupGroup.quaternion); }
-  }
-  if(!closed) held = false;
-  pinched = closed;
-
-  /* where the cup wants to be: home, or turned with the hand and hung
-     from the grip point by its middle (so it pivots there, not its base) */
-  const turn = held ? turnSinceGrab(g.hand).multiply(grabCup) : new THREE.Quaternion();
-  aim.set(0, 0, 0);
-  if(held){
-    plane.setFromNormalAndCoplanarPoint(camera.getWorldDirection(hit), middle);
-    ray.setFromCamera(ndc.set(g.x, g.y), camera);
-    if(ray.ray.intersectPlane(plane, hit)) aim.copy(hit).sub(middle.clone().applyQuaternion(turn));
-  }
-  cupGroup.position.lerp(aim, 0.3);   // smooths the model's jitter too
-  cupGroup.quaternion.slerp(turn, 0.3);
-}
-
+/* ── holding it — see hold.js ─────────────────────────────────────── */
 select(0);
-renderer.setAnimationLoop(() => { hold(); renderer.render(scene, camera); });
-</script>
+let holding = null;
+renderer.setAnimationLoop(() => { holding?.update(); renderer.render(scene, camera); });
 
-<script>
-  const W = 320, H = 240;
-  const TIPS = ["thumb_tip", "index_finger_tip"];   // the two that hold the cup
-  const GRAB   = 1.20;   // thumb–index gap / palm length to pick the cup up
-  const LET_GO = 1.45;   // …and to put it down
-  let handPose, video, hands = [], pinched = false;   // pinched: hands[0]'s grip, kept by the module
-
-  const gripGap = h => dist(h.thumb_tip.x, h.thumb_tip.y, h.index_finger_tip.x, h.index_finger_tip.y)
-                     / dist(h.wrist.x, h.wrist.y, h.middle_finger_mcp.x, h.middle_finger_mcp.y);
-
-  function preload() {
-    handPose = ml5.handPose({ flipped: true });
-  }
-
-  function setup() {
-    createCanvas(W, H);
-    video = createCapture(VIDEO, { flipped: true });
-    video.size(W, H);
-    video.hide();
-    handPose.detectStart(video, r => hands = r);
-  }
-
-  function draw() {
-    image(video, 0, 0, W, H);
-    drawingContext.shadowBlur = 16;
-    strokeWeight(1.5);
-    for (const hand of hands) {
-      const close = hand === hands[0] ? pinched : gripGap(hand) < GRAB;   // blue: close enough to hold
-      drawingContext.shadowColor = close ? "rgba(0, 240, 255, 0.9)" : "rgba(255, 40, 70, 0.9)";
-      fill(...(close ? [0, 230, 255] : [255, 40, 70]), 70);
-      stroke(...(close ? [200, 255, 255] : [255, 200, 205]), 200);
-      for (const name of TIPS) ellipse(hand[name].x, hand[name].y, 16);
-    }
-    drawingContext.shadowBlur = 0;
-  }
+const state = document.getElementById('hands-state');
+holdCup({ camera, cup: () => ({ group: cupGroup, h: vesselH }), preview: document.getElementById('hands') })
+  .then(h => { holding = h; state.remove(); })
+  .catch(() => state.textContent = 'No camera · ');
 </script>
 </body>
 </html>

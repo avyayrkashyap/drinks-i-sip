@@ -243,6 +243,7 @@
     border-radius:2px;padding:3px 9px;cursor:pointer;
   }
   .ghost:hover{color:var(--ink);border-color:#cfcfcf}
+  .ghost[aria-pressed="true"]{color:var(--paper);background:var(--ink);border-color:var(--ink)}
 
   /* --------------------------------------------------------------- map */
   #map{flex:1;min-height:0;position:relative}
@@ -276,6 +277,26 @@
 
   /* --------------------------------------------------------------- cup */
   #stage{flex:1;min-height:0}
+  .deck--cup{position:relative}
+
+  /* thumb and index while holding, as far apart as your fingers (--s: 0
+     touching, 1 wide open). Grey: no hand. Red: too far. Blue: hold. */
+  .hold{position:relative;display:inline-flex}
+  .grip{position:absolute;top:calc(100% + 9px);left:50%;width:56px;height:10px;margin-left:-28px;
+        --c:var(--mute);--glow:transparent;--s:1;--in:calc((1 - var(--s)) * 18px)}
+  .grip[hidden]{display:none}
+  .grip::before{content:"";position:absolute;left:calc(5px + var(--in));right:calc(5px + var(--in));
+                top:50%;border-top:1px solid var(--c);transition:opacity .2s}
+  .grip i{position:absolute;top:0;width:10px;height:10px;border-radius:50%;
+          border:1.5px solid var(--c);background:color-mix(in srgb,var(--c) 25%,transparent);
+          box-shadow:0 0 8px var(--glow);
+          transition:border-color .2s,background .2s,box-shadow .2s}
+  .grip i:first-of-type{left:0;transform:translateX(var(--in))}
+  .grip i:last-of-type{right:0;transform:translateX(calc(-1 * var(--in)))}
+  .grip[data-state="far"]{--c:rgb(255,40,70);--glow:rgba(255,40,70,.6)}
+  .grip[data-state="close"]{--c:rgb(0,200,235);--glow:rgba(0,240,255,.8)}
+  .grip:not([data-state="none"])::before{opacity:0}   /* a hand: the arc takes over */
+  .arc{position:absolute;left:0;top:-7px;width:56px;height:24px;pointer-events:none}
 
   @media (max-width:940px){
     :root{--pad:12px}
@@ -378,7 +399,13 @@
     </section>
 
     <section class="deck deck--cup">
-      <div class="deck-head"><span>Cup</span></div>
+      <div class="deck-head">
+        <span>Cup</span>
+        <span class="hold">
+          <button class="ghost" id="hold" aria-pressed="false">Hold cup</button>
+          <span class="grip" id="grip" data-state="none" hidden aria-hidden="true"><canvas class="arc" id="arc"></canvas><i></i><i></i></span>
+        </span>
+      </div>
       <div id="stage"></div>
     </section>
 
@@ -830,6 +857,7 @@ function select(i, fly){
 import * as THREE from 'three';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 import { buildCup, VESSELS, DEFAULT_CUP, DEFAULT_LIQUID, setLiquid, makeLiquid } from './cup.js';
+import { holdCup } from './hold.js';
 
 const el = document.getElementById('stage');
 const renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
@@ -890,7 +918,7 @@ function previewCfg(place){
   }catch(e){ return undefined; }
 }
 
-let cupGroup = null, current = null;
+let cupGroup = null, current = null, cupH = 1;
 
 function draw(place){
   if(!place) return;
@@ -911,10 +939,77 @@ function draw(place){
   });
   scene.add(cupGroup);
 
-  const h = (VESSELS[cfg.vessel] || VESSELS['Paper cup']).h;
-  controls.target.set(0, h * 0.5, 0);
+  cupH = (VESSELS[cfg.vessel] || VESSELS['Paper cup']).h;
+  controls.target.set(0, cupH * 0.5, 0);
   fit();
 }
+
+/* ── hold cup ─────────────────────────────────────────────────────────
+   Pick the cup up with your hand through the webcam — see hold.js. The
+   camera is only asked for when the toggle goes on, and the cup stops
+   spinning while it's on so it holds still to be picked up.
+   ─────────────────────────────────────────────────────────────────── */
+const holdBtn = document.getElementById('hold');
+const gripEl = document.getElementById('grip');
+
+/* Plasma between the fingertips while a hand is in view and they're too
+   far apart: a few strands, each a slow wander of two sines (organic)
+   plus a fresh crackle every frame (electric), pinned at both circles.
+   Reduced motion keeps the shape and drops the flicker. */
+const arcEl = document.getElementById('arc'), arcCtx = arcEl.getContext('2d');
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function drawArc(state, s, t){
+  const W = 56, H = 24, dpr = devicePixelRatio;
+  if(arcEl.width !== W * dpr){ arcEl.width = W * dpr; arcEl.height = H * dpr; }
+  arcCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  arcCtx.clearRect(0, 0, W, H);
+  if(state !== 'far') return;
+  if(still) t = 0;
+
+  const inset = (1 - s) * 18;
+  const x1 = 10 + inset, x2 = W - 10 - inset, y = H / 2;   // circle edges (r = 5, centres at 5 and 51)
+  const amp = (x2 - x1) / 36;                               // a shorter arc wanders less
+  arcCtx.shadowColor = 'rgba(255,40,70,.9)';
+  arcCtx.lineCap = arcCtx.lineJoin = 'round';
+  for(let k = 0; k < 3; k++){
+    arcCtx.beginPath();
+    for(let i = 0, N = 16; i <= N; i++){
+      const u = i / N, pin = Math.sin(Math.PI * u);
+      const off = pin * amp * (3 * Math.sin(u * 6 + t * .009 + k * 2.1)
+                             + 1.6 * Math.sin(u * 13 - t * .014 + k * 4.3)
+                             + (still ? 0 : (Math.random() - .5) * 2.4));
+      i ? arcCtx.lineTo(x1 + (x2 - x1) * u, y + off) : arcCtx.moveTo(x1, y);
+    }
+    arcCtx.lineWidth   = k ? .6 : 1.2;
+    arcCtx.shadowBlur  = k ? 4 : 7;
+    arcCtx.strokeStyle = k ? 'rgba(255,90,115,.55)' : 'rgb(255,40,70)';
+    arcCtx.stroke();
+  }
+}
+const spins = controls.autoRotate;
+let holding = null, spread = 1;   // spread eased, so the circles glide rather than jitter
+holdBtn.addEventListener('click', async () => {
+  if(holding){
+    holding.stop();
+    holding = null;
+    controls.autoRotate = spins;
+    gripEl.hidden = true;
+    holdBtn.setAttribute('aria-pressed', 'false');
+    return;
+  }
+  holdBtn.disabled = true;
+  holdBtn.textContent = 'Loading hands';
+  try{
+    holding = await holdCup({ camera, cup: () => ({ group: cupGroup, h: cupH }) });
+    controls.autoRotate = false;
+    gripEl.hidden = false;
+    holdBtn.setAttribute('aria-pressed', 'true');
+  }catch(e){
+    console.warn('hold cup:', e);
+  }
+  holdBtn.disabled = false;
+  holdBtn.textContent = 'Hold cup';
+});
 
 /* the board calls this whenever the selection changes */
 window.setSleeve = draw;
@@ -1028,6 +1123,13 @@ fit();
 (function tick(){
   requestAnimationFrame(tick);
   controls.update();
+  if(holding){
+    const grip = holding.update();
+    if(gripEl.dataset.state !== grip.state) gripEl.dataset.state = grip.state;
+    spread += (grip.spread - spread) * 0.3;
+    gripEl.style.setProperty('--s', spread.toFixed(3));
+    drawArc(grip.state, spread, performance.now());
+  }
   renderer.render(scene, camera);
 })();
 </script>
