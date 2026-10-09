@@ -74,6 +74,10 @@ export async function holdCup({ camera, cup, preview }){
     video.width = video.videoWidth;
     video.height = video.videoHeight;
     await loadMl5();
+    // iOS 26's WebGPU hands TF.js video frames turned 90°, so every keypoint
+    // lands in the wrong place; copying frames instead fixes it (ml5 1.4 does
+    // the same: github.com/tensorflow/tfjs/issues/8733, ml5-next-gen#306)
+    ml5.tf.env().set('WEBGPU_IMPORT_EXTERNAL_TEXTURE', false);
     model = ml5.handPose({ flipped: true, maxHands: 1 });
     await model.ready;
   }catch(err){
