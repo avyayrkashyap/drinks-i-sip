@@ -276,7 +276,10 @@
   .row-price{font-size:10px;letter-spacing:.06em;color:var(--mute)}
 
   /* --------------------------------------------------------------- cup */
-  #stage{flex:1;min-height:0}
+  #stage{flex:1;min-height:0;position:relative;isolation:isolate}
+  /* holding: the stage turns into a mirror, the cup in front of you */
+  #stage video{position:absolute;inset:0;z-index:-1;width:100%;height:100%;object-fit:cover;transform:scaleX(-1)}
+  #stage video ~ canvas{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .deck--cup{position:relative}
 
   /* thumb and index while holding, as far apart as your fingers (--s: 0
@@ -894,6 +897,89 @@ disc.rotation.x = -Math.PI / 2;
 disc.position.y = 0.001;
 scene.add(disc);
 
+/* ── the pad ──────────────────────────────────────────────────────────
+   While you hold cups, the cup rests on a pad hovering over a fainter
+   echo of itself: rings, ticks, ripples and a sweep, drawn on a canvas
+   each frame. Blue and turning while the cup is on it; pick the cup up
+   and it greys and winds down to a stop, lighting up again when you
+   bring it back over it. Fades in with the framing.
+   ─────────────────────────────────────────────────────────────────── */
+const padCanvas = Object.assign(document.createElement('canvas'), { width:512, height:512 });
+const padCtx = padCanvas.getContext('2d');
+const padTex = new THREE.CanvasTexture(padCanvas);
+padTex.colorSpace = THREE.SRGBColorSpace;
+const pad = new THREE.Mesh(
+  new THREE.CircleGeometry(0.95, 64),
+  new THREE.MeshBasicMaterial({ map:padTex, transparent:true, depthWrite:false, opacity:0 })
+);
+pad.rotation.x = -Math.PI / 2;
+pad.position.y = -0.004;                 // just under the cup's base
+const echo = new THREE.Mesh(pad.geometry, pad.material.clone());
+echo.rotation.x = -Math.PI / 2;
+echo.position.y = -0.18;
+echo.scale.setScalar(0.72);
+const pads = new THREE.Group();
+pads.add(pad, echo);
+pads.visible = false;
+scene.add(pads);
+
+let padLive = 1, padT = 0, padDrawn = -1;   // live: 1 blue and moving, 0 grey and still
+function drawPad(dt, on){
+  padLive += ((on ? 1 : 0) - padLive) * 0.08;
+  if(Math.abs(padLive - (on ? 1 : 0)) < 1e-3) padLive = on ? 1 : 0;
+  if(!padLive && !padDrawn) return;      // grey and still: nothing changes
+  if(!still) padT += dt * padLive;        // so it winds down rather than stopping dead
+  padDrawn = padLive;
+
+  const k = padLive, t = padT, ctx = padCtx;
+  const rgb = [160 - 160 * k, 160 + 54 * k, 165 + 90 * k].map(Math.round).join(',');   // grey → cyan
+  const C = a => `rgba(${rgb},${a})`;
+  const ring = (r, w, a, dash = [], off = 0) => {
+    ctx.beginPath(); ctx.arc(0, 0, r, 0, Math.PI * 2);
+    ctx.lineWidth = w; ctx.strokeStyle = C(a);
+    ctx.setLineDash(dash); ctx.lineDashOffset = off; ctx.stroke();
+  };
+  ctx.setTransform(1, 0, 0, 1, 256, 256);
+  ctx.clearRect(-256, -256, 512, 512);
+  ctx.lineCap = 'round';
+
+  const fill = ctx.createRadialGradient(0, 0, 0, 0, 0, 250);
+  fill.addColorStop(0, C(0.22)); fill.addColorStop(0.55, C(0.1)); fill.addColorStop(1, C(0));
+  ctx.fillStyle = fill;
+  ctx.beginPath(); ctx.arc(0, 0, 250, 0, Math.PI * 2); ctx.fill();
+
+  if(k && ctx.createConicGradient){       // a sweep going round
+    const sweep = ctx.createConicGradient(t * 1.6, 0, 0);
+    sweep.addColorStop(0, C(0.4 * k)); sweep.addColorStop(0.14, C(0)); sweep.addColorStop(1, C(0));
+    ctx.fillStyle = sweep;
+    ctx.beginPath(); ctx.arc(0, 0, 238, 0, Math.PI * 2); ctx.fill();
+  }
+
+  ring(244, 2.5, 0.95);                           // rim
+  ring(228, 5, 0.55, [1, 11], -t * 40);           // a dotted track, running round
+  ctx.save(); ctx.rotate(-t * 0.25);              // ticks, turning the other way
+  for(let i = 0; i < 72; i++){
+    const long = i % 6 === 0;
+    ctx.rotate(Math.PI / 36);
+    ctx.beginPath(); ctx.moveTo(196, 0); ctx.lineTo(long ? 216 : 206, 0);
+    ctx.lineWidth = long ? 2.5 : 1.2; ctx.strokeStyle = C(long ? 0.9 : 0.5); ctx.setLineDash([]); ctx.stroke();
+  }
+  ctx.restore();
+  ring(178, 1.5, 0.7, [60, 18, 8, 18], t * 90);   // a dashed ring
+  for(let i = 0; i < 3; i++){                     // three arcs chasing round
+    const a = t * 1.2 + i * Math.PI * 2 / 3;
+    ctx.beginPath(); ctx.arc(0, 0, 156, a, a + 0.9);
+    ctx.lineWidth = 6; ctx.strokeStyle = C(0.85); ctx.setLineDash([]); ctx.stroke();
+  }
+  for(let i = 0; i < 2; i++){                     // ripples out from under the cup
+    const p = (t * 0.45 + i / 2) % 1;
+    ring(124 + p * 110, 1.5, (1 - p) * 0.6 * k);
+  }
+  ring(124, 3, 1);                                // where the cup stands
+  ring(98, 1, 0.45, [3, 6], t * 20);
+  padTex.needsUpdate = true;
+}
+
 const texLoader = new THREE.TextureLoader();
 const texCache  = new Map();
 const maxAniso  = renderer.capabilities.getMaxAnisotropy();
@@ -988,10 +1074,12 @@ function drawArc(state, s, t){
 }
 const spins = controls.autoRotate;
 let holding = null, spread = 1;   // spread eased, so the circles glide rather than jitter
+let low = 0, lowTo = 0;           // the framing: 0 the usual, 1 the cup in the lower half
 holdBtn.addEventListener('click', async () => {
   if(holding){
     holding.stop();
     holding = null;
+    lowTo = 0;
     controls.autoRotate = spins;
     gripEl.hidden = true;
     holdBtn.setAttribute('aria-pressed', 'false');
@@ -999,14 +1087,17 @@ holdBtn.addEventListener('click', async () => {
   }
   holdBtn.disabled = true;
   holdBtn.textContent = 'Loading hands';
+  lowTo = 1;                      // the cup moves down while the camera starts
+  controls.autoRotate = false;
   try{
-    holding = await holdCup({ camera, cup: () => ({ group: cupGroup, h: cupH }) });
-    controls.autoRotate = false;
+    holding = await holdCup({ camera, cup: () => ({ group: cupGroup, h: cupH }), preview: el });
     gripEl.hidden = false;
     holdBtn.setAttribute('aria-pressed', 'true');
     holdBtn.textContent = 'Hold cup';
   }catch(e){
     console.warn('hold cup:', e);
+    lowTo = 0;
+    controls.autoRotate = spins;
     // say why, briefly — on a phone there's no console to look in
     holdBtn.textContent = e.name === 'NotAllowedError' ? 'Camera blocked'
                         : e.name === 'NotFoundError'   ? 'No camera'
@@ -1111,30 +1202,55 @@ function fit(){
   const w = el.clientWidth, h = el.clientHeight;
   if(!w || !h) return;
   renderer.setSize(w, h);
-  camera.aspect = w / h;
-  camera.updateProjectionMatrix();
+  camera.position.copy(controls.target).add(new THREE.Vector3(0.62, 0.55, 0.86));
+  frame();
+}
+
+/* how far back the camera sits, along whichever way it's looking now. As
+   `low` goes 0 → 1 the cup is fitted to a band shrinking from the whole
+   stage to its lower half, and the view shifts down to put it there —
+   under your face while you hold it. */
+function frame(){
+  const w = el.clientWidth, h = el.clientHeight;
+  if(!w || !h) return;
+  const fh = h / (1 + low);
+  camera.aspect = w / fh;
+  camera.setViewOffset(w, fh, 0, fh - h, w, h);
+  pads.visible = low > 0;
+  pad.material.opacity = low;
+  echo.material.opacity = low * 0.35;
+  disc.material.opacity = 0.04 * (1 - low);       // the pad stands in for the shadow
   const R = Math.max((VESSELS[(current?.cup?.vessel) || 'Paper cup'] || VESSELS['Paper cup']).h * 0.62, 0.8);
   const vFov = camera.fov * Math.PI / 180;
   const hFov = 2 * Math.atan(Math.tan(vFov / 2) * camera.aspect);
   const d = R / Math.tan(Math.min(vFov, hFov) / 2) * 1.2;
-  camera.position.copy(controls.target).add(
-    new THREE.Vector3(0.62, 0.55, 0.86).normalize().multiplyScalar(d));
+  camera.position.sub(controls.target).setLength(d).add(controls.target);
   controls.update();
 }
 new ResizeObserver(fit).observe(el);
 addEventListener('resize', fit);
 fit();
 
+let last = performance.now();
 (function tick(){
   requestAnimationFrame(tick);
+  const now = performance.now(), dt = Math.min((now - last) / 1000, 0.1);
+  last = now;
+  if(low !== lowTo){
+    low = still || Math.abs(lowTo - low) < 1e-3 ? lowTo : low + (lowTo - low) * 0.1;
+    frame();
+  }
   controls.update();
+  let lit = true;                 // the pad: lit unless the cup's held away from it
   if(holding){
     const grip = holding.update();
+    lit = grip.state !== 'close' || grip.over;
     if(gripEl.dataset.state !== grip.state) gripEl.dataset.state = grip.state;
     spread += (grip.spread - spread) * 0.3;
     gripEl.style.setProperty('--s', spread.toFixed(3));
-    drawArc(grip.state, spread, performance.now());
+    drawArc(grip.state, spread, now);
   }
+  if(pads.visible) drawPad(dt, lit);
   renderer.render(scene, camera);
 })();
 </script>
